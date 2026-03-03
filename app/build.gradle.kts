@@ -120,14 +120,6 @@ android {
     lint {
         disable.add("PropertyEscape")
     }
-
-    applicationVariants.all {
-        outputs.all {
-            val output = this
-            val fileName = output.outputFileName.replace("app-", "otter-")
-            output.outputFileName = fileName
-        }
-    }
 }
 
 dependencies {
