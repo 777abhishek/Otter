@@ -1,0 +1,18 @@
+# Ktlint Configuration
+# https://pinterest.github.io/ktlint/latest/
+
+disabled_rules=no-wildcard-imports
+
+# Indentation
+indent_size=4
+continuation_indent_size=4
+
+# Maximum line length
+max_line_length=120
+
+# Other settings
+insert_final_newline=true
+trim_trailing_whitespace=true
+
+# Import ordering
+import_ordering=android,java,javax,kotlin,*,java,javax,kotlin

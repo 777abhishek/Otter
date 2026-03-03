@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <!-- Dark background for splash screen so the white icon is visible -->
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <!-- Explicitly transparent background for the icon container to remove the 'box' effect -->
+        <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <!-- Use the inset transparent foreground icon, NO background box/circle -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/app_icon_inset</item>
+        <!-- After splash screen, hand off to standard App theme -->
+        <item name="postSplashScreenTheme">@style/Theme.AppCompat.DayNight</item>
+    </style>
+</resources>

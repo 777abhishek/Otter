@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Only run if secrets are configured (repo owner only)
+# Forks won't have access to these secrets, so release builds only work for the main repo
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Set Gradle env
+        run: |
+          echo "GRADLE_OPTS=-Dorg.gradle.jvmargs='-Xmx4g -Dkotlin.daemon.jvm.options=\"-Xmx2g\"'" >> $GITHUB_ENV
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Decode keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release-key.jks
+
+      - name: Create keystore properties
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        run: |
+          cat > keystore.properties << EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=../release-key.jks
+          EOF
+
+      - name: Build release APK
+        run: ./gradlew assembleRelease --stacktrace
+        env:
+          Otter_BACKEND_BASE_URL: ${{ secrets.OTTER_BACKEND_BASE_URL || '' }}
+          Otter_APP_API_KEY: ${{ secrets.OTTER_APP_API_KEY || '' }}
+
+      - name: Build release bundle
+        run: ./gradlew bundleRelease --stacktrace
+        env:
+          Otter_BACKEND_BASE_URL: ${{ secrets.OTTER_BACKEND_BASE_URL || '' }}
+          Otter_APP_API_KEY: ${{ secrets.OTTER_APP_API_KEY || '' }}
+
+      - name: Verify build outputs
+        run: |
+          echo "APK outputs:"
+          find app/build/outputs/apk/release -name "*.apk" -type f || true
+          echo "AAB outputs:"
+          ls -la app/build/outputs/bundle/release || true
+          APK_COUNT=$(find app/build/outputs/apk/release -name "*.apk" -type f | wc -l)
+          if [ "$APK_COUNT" = "0" ]; then
+            echo "No release APKs found"
+            exit 1
+          fi
+          if [ ! -f app/build/outputs/bundle/release/app-release.aab ]; then
+            echo "No release AAB found at app/build/outputs/bundle/release/app-release.aab"
+            exit 1
+          fi
+
+      - name: Upload release APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/**/*.apk
+
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-bundle
+          path: app/build/outputs/bundle/release/app-release.aab
+
+      - name: Debug release info
+        run: |
+          echo "github.ref: ${{ github.ref }}"
+          echo "github.ref_type: ${{ github.ref_type }}"
+          echo "github.ref_name: ${{ github.ref_name }}"
+          echo "Is tag push: ${{ github.ref_type == 'tag' }}"
+          echo "github.actor: ${{ github.actor }}"
+          echo "github.repository: ${{ github.repository }}"
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ github.token }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            app/build/outputs/apk/release/**/*.apk
+            app/build/outputs/bundle/release/app-release.aab

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- White background for launcher icon (app icon) -->
+    <color name="launcher_background">#FFFFFF</color>
+    <!-- Dark background for splash screen with white icon -->
+    <color name="splash_background">#000000</color>
+</resources>

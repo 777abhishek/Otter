@@ -1,0 +1,481 @@
+package com.Otter.app.ui.screens.player
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PlaybackSettingsSheet(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    dataSaver: Boolean,
+    currentMaxHeight: Int,
+    currentCodec: CodecChoice,
+    captionsEnabled: Boolean,
+    selectedCaptionLanguage: String?,
+    availableCaptionLanguages: List<String>,
+    onCaptionsEnabledChanged: (Boolean) -> Unit,
+    onCaptionLanguageSelected: (String?) -> Unit,
+    selectedAudioLanguage: String?,
+    availableAudioLanguages: List<String>,
+    onAudioLanguageSelected: (String?) -> Unit,
+    onDataSaverChanged: (Boolean) -> Unit,
+    onQualityClick: () -> Unit,
+    onAudioClick: () -> Unit,
+    onCodecSelected: (CodecChoice) -> Unit,
+    playbackSpeed: Float = 1f,
+    onPlaybackSpeedChanged: (Float) -> Unit = {},
+    // Stream info for richer track names (same source as Info tab)
+    streamInfo: com.Otter.app.data.repositories.StreamInfoResult? = null,
+    // Track groups from Media3 for proper selection
+    audioTrackGroups: List<com.Otter.app.player.AudioTrackGroup> = emptyList(),
+    captionTrackGroups: List<com.Otter.app.player.CaptionTrackGroup> = emptyList(),
+    onSelectAudioTrack: (groupIndex: Int, trackIndex: Int) -> Unit = { _, _ -> },
+    onSelectCaptionTrack: (groupIndex: Int, trackIndex: Int) -> Unit = { _, _ -> },
+) {
+    if (!show) return
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showCaptionOptions by remember { mutableStateOf(false) }
+    var showCodecOptions by remember { mutableStateOf(false) }
+    var showSpeedOptions by remember { mutableStateOf(false) }
+    // Audio options now handled by PlayerAudioSheet
+
+    data class CaptionOption(
+        val label: String,
+        val languageCode: String?,
+        val trackGroup: com.Otter.app.player.CaptionTrackGroup?,
+    )
+
+    // Compute track options outside LazyColumn items (can't use remember inside items lambda)
+    // Prefer Media3 track groups for selection when available; otherwise fall back to StreamInfo language lists.
+    val captionOptions =
+        remember(captionTrackGroups, streamInfo, availableCaptionLanguages) {
+            when {
+                captionTrackGroups.isNotEmpty() -> {
+                    captionTrackGroups.map {
+                        CaptionOption(
+                            label = it.label,
+                            languageCode = it.languageTag,
+                            trackGroup = it,
+                        )
+                    }
+                }
+                streamInfo != null -> {
+                    streamInfo.subtitles
+                        .map { sub ->
+                            val langCode = sub.languageCode.takeIf { it.isNotBlank() }
+                            val base = sub.languageName.ifBlank { sub.languageCode }.ifBlank { "Unknown" }
+                            val label =
+                                buildString {
+                                    append(base)
+                                    if (sub.isAutoGenerated) append(" (auto)")
+                                    val fmt = sub.format.takeIf { it.isNotBlank() }
+                                    if (fmt != null) append(" • ").append(fmt)
+                                }
+                            CaptionOption(label = label, languageCode = langCode, trackGroup = null)
+                        }
+                }
+                else -> {
+                    availableCaptionLanguages.map { lang ->
+                        CaptionOption(label = lang, languageCode = lang, trackGroup = null)
+                    }
+                }
+            }
+        }
+
+    // Audio options are now handled in PlayerAudioSheet
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        tonalElevation = 0.dp,
+    ) {
+        LazyColumn(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp),
+            contentPadding =
+                androidx.compose.foundation.layout.PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = 0.dp,
+                    bottom = 24.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            // ── Header ────────────────────────────────────────────────────
+            item {
+                Text(
+                    text = "Playback Settings",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+            }
+
+            // ── Quality ───────────────────────────────────────────────────
+            item { SectionLabel("Quality") }
+
+            item {
+                val qualityText =
+                    when (currentMaxHeight) {
+                        Int.MAX_VALUE -> "Auto"
+                        else -> "${currentMaxHeight}p"
+                    }
+                SettingsNavRow(label = "Video quality", value = qualityText, onClick = onQualityClick)
+            }
+
+            item {
+                SettingsNavRow(
+                    label = "Audio language",
+                    value = selectedAudioLanguage ?: "Auto",
+                    onClick = onAudioClick,
+                )
+            }
+
+            item { SheetDivider() }
+
+            // ── Playback Speed ─────────────────────────────────────────────
+            item { SectionLabel("Playback Speed") }
+
+            item {
+                val speedText = "${playbackSpeed}x"
+                SettingsNavRow(
+                    label = "Speed",
+                    value = speedText,
+                    onClick = { showSpeedOptions = !showSpeedOptions },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                )
+            }
+
+            if (showSpeedOptions) {
+                items(listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)) { speed ->
+                    InlineOptionRow(
+                        label = "${speed}x",
+                        selected = speed == playbackSpeed,
+                        onClick = {
+                            onPlaybackSpeedChanged(speed)
+                            showSpeedOptions = false
+                        },
+                    )
+                }
+            }
+
+            item { SheetDivider() }
+
+            // ── Playback ──────────────────────────────────────────────────
+            item { SectionLabel("Playback") }
+
+            item { SettingsToggleRow(label = "Data saver  ≤ 480p", checked = dataSaver, onCheckedChange = onDataSaverChanged) }
+
+            item { SheetDivider() }
+
+            // ── Codec ──────────────────────────────────────────────────────
+            item { SectionLabel("Codec") }
+
+            item {
+                SettingsNavRow(
+                    label = "Video codec",
+                    value = currentCodec.name.lowercase().replaceFirstChar { it.uppercase() },
+                    onClick = { showCodecOptions = !showCodecOptions },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                )
+            }
+
+            if (showCodecOptions) {
+                items(CodecChoice.entries) { choice ->
+                    val isSelected = choice == currentCodec
+                    InlineOptionRow(
+                        label = choice.name.lowercase().replaceFirstChar { it.uppercase() },
+                        selected = isSelected,
+                        onClick = {
+                            onCodecSelected(choice)
+                            showCodecOptions = false
+                        },
+                    )
+                }
+            }
+
+            item { SheetDivider() }
+
+            // ── Captions ──────────────────────────────────────────────────
+            item { SectionLabel("Captions") }
+
+            item {
+                SettingsToggleRow(
+                    label = "Captions",
+                    checked = captionsEnabled,
+                    onCheckedChange = onCaptionsEnabledChanged,
+                )
+            }
+
+            item {
+                SettingsNavRow(
+                    label = "Caption language",
+                    value = selectedCaptionLanguage ?: "Auto",
+                    enabled = captionsEnabled,
+                    onClick = { if (captionsEnabled) showCaptionOptions = !showCaptionOptions },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.ExpandMore,
+                            contentDescription = null,
+                            tint =
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                    alpha = if (captionsEnabled) 1f else 0.38f,
+                                ),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                )
+            }
+
+            if (showCaptionOptions) {
+                // Auto option
+                item {
+                    InlineOptionRow(
+                        label = "Auto",
+                        selected = selectedCaptionLanguage == null,
+                        enabled = captionsEnabled,
+                        onClick = { onCaptionLanguageSelected(null) },
+                    )
+                }
+                // Caption tracks from Media3
+                items(captionOptions) { option ->
+                    InlineOptionRow(
+                        label = option.label,
+                        selected = option.trackGroup?.isSelected == true || (option.languageCode != null && selectedCaptionLanguage == option.languageCode),
+                        enabled = captionsEnabled,
+                        onClick = {
+                            val trackGroup = option.trackGroup
+                            if (trackGroup != null) {
+                                onSelectCaptionTrack(trackGroup.groupIndex, trackGroup.trackIndex)
+                            } else {
+                                onCaptionLanguageSelected(option.languageCode)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+enum class CodecChoice { AUTO, AV1, VP9, H264 }
+
+// ── Shared Sheet Components ───────────────────────────────────────────────────
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun SheetDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 8.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+    )
+}
+
+@Composable
+fun SettingsToggleRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(enabled = enabled) { onCheckedChange(!checked) }
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+            modifier =
+                Modifier
+                    .height(28.dp)
+                    .padding(0.dp),
+            colors =
+                SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+        )
+    }
+}
+
+@Composable
+fun SettingsNavRow(
+    label: String,
+    value: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    trailingIcon: @Composable (() -> Unit)? = {
+        Icon(
+            Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    },
+) {
+    val alpha = if (enabled) 1f else 0.38f
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 4.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+        )
+        if (trailingIcon != null) trailingIcon()
+    }
+}
+
+@Composable
+fun InlineOptionRow(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val alpha = if (enabled) 1f else 0.38f
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    if (selected) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    } else {
+                        Color.Transparent
+                    },
+                )
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Selection dot
+        Box(
+            modifier =
+                Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            Color.Transparent
+                        },
+                    ),
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color =
+                if (selected) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = alpha)
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                },
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Icon(
+                Icons.Rounded.Check,
+                contentDescription = "Selected",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
+            )
+        }
+    }
+}
