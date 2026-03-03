@@ -85,9 +85,7 @@ android {
         buildConfig = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
-    }
+    // composeOptions removed: Managed by 'org.jetbrains.kotlin.plugin.compose' in Kotlin 2.0+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -109,16 +107,21 @@ android {
     }
 
     bundle {
-        language {
-            enableSplit = false
-        }
-        density {
-            enableSplit = false
-        }
+        language { enableSplit = false }
+        density { enableSplit = false }
     }
 
     lint {
         disable.add("PropertyEscape")
+    }
+
+    // --- NEW: Rename Build Output ---
+    applicationVariants.all {
+        outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val abi = output?.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
+            output?.outputFileName = "Otter-arm-$abi-${buildType.name}.apk"
+        }
     }
 }
 
