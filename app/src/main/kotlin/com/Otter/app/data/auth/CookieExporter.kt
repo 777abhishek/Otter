@@ -40,21 +40,37 @@ class CookieExporter
                 }
 
                 val combinedCookieString = cookieStrings.joinToString(";")
-                if (target.id == CookieTargetCatalog.TARGET_YOUTUBE) {
-                    val hasAuthCookies =
-                        listOf(
-                            "SAPISID=",
-                            "APISID=",
-                            "SID=",
-                            "__Secure-3PAPISID=",
-                            "__Secure-3PSID=",
-                        ).any { combinedCookieString.contains(it, ignoreCase = false) }
-
-                    if (!hasAuthCookies) {
-                        throw IllegalStateException(
-                            "Login cookies not detected yet. Please complete login, then open youtube.com in the WebView (feed/library), wait for the page to fully load, and try again.",
-                        )
+                val hasAuthCookies =
+                    when (target.id) {
+                        CookieTargetCatalog.TARGET_YOUTUBE ->
+                            listOf(
+                                "SAPISID=",
+                                "APISID=",
+                                "SID=",
+                                "__Secure-3PAPISID=",
+                                "__Secure-3PSID=",
+                            ).any { combinedCookieString.contains(it, ignoreCase = false) }
+                        CookieTargetCatalog.TARGET_INSTAGRAM ->
+                            listOf(
+                                "sessionid=",
+                                "ds_user_id=",
+                            ).any { combinedCookieString.contains(it, ignoreCase = false) }
+                        CookieTargetCatalog.TARGET_TWITTER ->
+                            listOf(
+                                "auth_token=",
+                                "ct0=",
+                            ).any { combinedCookieString.contains(it, ignoreCase = false) }
+                        CookieTargetCatalog.TARGET_REDDIT ->
+                            listOf(
+                                "reddit_session=",
+                            ).any { combinedCookieString.contains(it, ignoreCase = false) }
+                        else -> true
                     }
+
+                if (!hasAuthCookies) {
+                    throw IllegalStateException(
+                        "Login cookies not detected yet. Please complete login, then open the site home feed/profile page, wait for it to fully load, and try again.",
+                    )
                 }
 
                 val outDir = File(context.filesDir, "cookies")

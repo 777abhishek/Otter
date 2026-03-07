@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,151 +46,152 @@ fun ProfilesSettings(
     var showDeleteConfirmDialog by remember { mutableStateOf<YouTubeProfile?>(null) }
     val scrollState = rememberScrollState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Profiles") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                ),
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Header with back button and title
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Instruction Card
-            Material3ExpressiveSettingsGroup(
-                modifier = Modifier.fillMaxWidth(),
-                items =
-                    listOf(
-                        {
-                            ModernInfoItem(
-                                icon = { Icon(Icons.Rounded.Person, null, modifier = Modifier.size(22.dp)) },
-                                title = "Profile Management",
-                                subtitle = "Add a profile, then manage cookie targets per profile.",
-                                onClick = null,
-                                showArrow = false,
-                            )
-                        },
-                    ),
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Text(
+                text = "Profiles",
+                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
+        }
 
-            if (profiles.isEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        ),
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Instruction Card
+        Material3ExpressiveSettingsGroup(
+            modifier = Modifier.fillMaxWidth(),
+            items =
+                listOf(
+                    {
+                        ModernInfoItem(
+                            icon = { Icon(Icons.Rounded.Person, null, modifier = Modifier.size(22.dp)) },
+                            title = "Profile Management",
+                            subtitle = "Add a profile, then manage cookie targets per profile.",
+                            onClick = null,
+                            showArrow = false,
+                        )
+                    },
+                ),
+        )
+
+        if (profiles.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    ),
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Icon(
-                            Icons.Rounded.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = "No Profiles Yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "Tap 'Add Profile' to create your first profile. Then open Cookie Targets to connect or import cookies per website.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        )
-                    }
+                    Icon(
+                        Icons.Rounded.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "No Profiles Yet",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Tap 'Add Profile' to create your first profile. Then open Cookie Targets to connect or import cookies per website.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
                 }
             }
+        }
 
-            if (profiles.isNotEmpty()) {
-                Material3ExpressiveSettingsGroup(
-                    modifier = Modifier.fillMaxWidth(),
-                    items =
-                        profiles.map { profile ->
-                            {
-                                val isActive = profile.id == activeProfileId
-                                ModernInfoItem(
-                                    icon = {
-                                        Icon(
-                                            imageVector = if (isActive) Icons.Rounded.Check else Icons.Rounded.Person,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(22.dp),
-                                        )
-                                    },
-                                    title = profile.label,
-                                    subtitle = if (isActive) "Active" else "Tap to set active",
-                                    onClick = {
-                                        if (!isActive) {
-                                            scope.launch { viewModel.setActiveProfile(profile.id) }
-                                        }
-                                    },
-                                    showArrow = false,
-                                    trailingContent = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            IconButton(
-                                                onClick = {
-                                                    navController.navigate("cookieTargets?profileId=${profile.id}")
-                                                },
-                                            ) {
-                                                Icon(Icons.Rounded.Cookie, contentDescription = null)
-                                            }
-                                            IconButton(
-                                                onClick = { showDeleteConfirmDialog = profile },
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.Delete,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.error,
-                                                )
-                                            }
-                                        }
-                                    },
-                                )
-                            }
-                        },
-                )
-            }
-
+        if (profiles.isNotEmpty()) {
             Material3ExpressiveSettingsGroup(
                 modifier = Modifier.fillMaxWidth(),
                 items =
-                    listOf(
+                    profiles.map { profile ->
                         {
+                            val isActive = profile.id == activeProfileId
                             ModernInfoItem(
-                                icon = { Icon(Icons.Default.Add, null, modifier = Modifier.size(22.dp)) },
-                                title = "Add Profile",
-                                subtitle = "Create a new profile",
-                                onClick = { showAddProfileDialog = true },
-                                showArrow = true,
+                                icon = {
+                                    Icon(
+                                        imageVector = if (isActive) Icons.Rounded.Check else Icons.Rounded.Person,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                },
+                                title = profile.label,
+                                subtitle = if (isActive) "Active" else "Tap to set active",
+                                onClick = {
+                                    if (!isActive) {
+                                        scope.launch { viewModel.setActiveProfile(profile.id) }
+                                    }
+                                },
+                                showArrow = false,
+                                trailingContent = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(
+                                            onClick = {
+                                                navController.navigate("cookieTargets?profileId=${profile.id}")
+                                            },
+                                        ) {
+                                            Icon(Icons.Rounded.Cookie, contentDescription = null)
+                                        }
+                                        IconButton(
+                                            onClick = { showDeleteConfirmDialog = profile },
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                    }
+                                },
                             )
-                        },
-                    ),
+                        }
+                    },
             )
-
-            Spacer(modifier = Modifier.height(80.dp))
         }
+
+        Material3ExpressiveSettingsGroup(
+            modifier = Modifier.fillMaxWidth(),
+            items =
+                listOf(
+                    {
+                        ModernInfoItem(
+                            icon = { Icon(Icons.Default.Add, null, modifier = Modifier.size(22.dp)) },
+                            title = "Add Profile",
+                            subtitle = "Create a new profile",
+                            onClick = { showAddProfileDialog = true },
+                            showArrow = true,
+                        )
+                    },
+                ),
+        )
+
+        Spacer(modifier = Modifier.height(80.dp))
     }
 
     if (showAddProfileDialog) {

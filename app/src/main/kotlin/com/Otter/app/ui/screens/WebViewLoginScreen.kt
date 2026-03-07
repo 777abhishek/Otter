@@ -183,15 +183,30 @@ fun WebViewLoginScreen(
                                             }
                                             CookieTargetCatalog.TARGET_INSTAGRAM -> {
                                                 val isOnDomain = urlMatchesAnyDomain(u, listOf("instagram.com"))
-                                                isOnDomain
+                                                val hasAuthCookies =
+                                                    hasAnyCookie(
+                                                        "https://www.instagram.com",
+                                                        listOf("sessionid", "ds_user_id"),
+                                                    )
+                                                isOnDomain && hasAuthCookies
                                             }
                                             CookieTargetCatalog.TARGET_TWITTER -> {
                                                 val isOnDomain = urlMatchesAnyDomain(u, listOf("x.com", "twitter.com"))
-                                                isOnDomain
+                                                val hasAuthCookies =
+                                                    hasAnyCookie(
+                                                        "https://x.com",
+                                                        listOf("auth_token", "ct0"),
+                                                    )
+                                                isOnDomain && hasAuthCookies
                                             }
                                             CookieTargetCatalog.TARGET_REDDIT -> {
                                                 val isOnDomain = urlMatchesAnyDomain(u, listOf("reddit.com"))
-                                                isOnDomain
+                                                val hasAuthCookies =
+                                                    hasAnyCookie(
+                                                        "https://www.reddit.com",
+                                                        listOf("reddit_session"),
+                                                    )
+                                                isOnDomain && hasAuthCookies
                                             }
                                             else -> {
                                                 val t = target

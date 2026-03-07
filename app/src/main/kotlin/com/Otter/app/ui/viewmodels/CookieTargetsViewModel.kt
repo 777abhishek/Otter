@@ -12,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -42,6 +43,7 @@ class CookieTargetsViewModel
                 .map { list ->
                     list.filter { it.profileId == profileId }.associateBy { it.targetId }
                 }
+                .distinctUntilChanged()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
         }
 
@@ -156,6 +158,40 @@ class CookieTargetsViewModel
                         validateNetscapeCookiesFile(destFile)
 
                         cookieAuthStore.upsertCookiesFilePath(profileId, targetId, destFile.absolutePath)
+                        cookieAuthStore.setEnabledForYtDlp(profileId, targetId, true)
+                    }
+                }
+            }
+        }
+
+        fun importCookiesFromText(
+            context: Context,
+            profileId: String,
+            targetId: String,
+            netscapeCookiesText: String,
+        ) {
+            viewModelScope.launch {
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        val cookiesDir = File(context.filesDir, "cookies").apply { mkdirs() }
+                        val destFile = File(cookiesDir, "cookies_${profileId}_$targetId.txt")
+
+                        val normalized = netscapeCookiesText.trimStart()
+                        destFile.writeText(
+                            if (normalized.startsWith(
+                                    "# Netscape HTTP Cookie File",
+                                )
+                            ) {
+                                normalized
+                            } else {
+                                "# Netscape HTTP Cookie File\n$normalized"
+                            },
+                        )
+
+                        validateNetscapeCookiesFile(destFile)
+
+                        cookieAuthStore.upsertCookiesFilePath(profileId, targetId, destFile.absolutePath)
+                        cookieAuthStore.setEnabledForYtDlp(profileId, targetId, true)
                     }
                 }
             }

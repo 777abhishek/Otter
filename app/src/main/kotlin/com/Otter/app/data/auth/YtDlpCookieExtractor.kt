@@ -21,6 +21,7 @@ class YtDlpCookieExtractor
         @ApplicationContext private val context: Context,
         private val ytDlpManager: YtDlpManager,
         private val cookieStore: YouTubeProfileStore,
+        private val cookieAuthStore: CookieAuthStore,
     ) {
         private fun validateNetscapeCookiesFile(file: File) {
             if (!file.exists() || file.length() < 50L) {
@@ -45,6 +46,57 @@ class YtDlpCookieExtractor
             }
         }
 
+        private fun hasUsableYouTubeLoginCookies(file: File): Boolean {
+            if (!file.exists() || file.length() < 50L) return false
+
+            val nowEpochSeconds = System.currentTimeMillis() / 1000L
+
+            fun looksLikeYouTubeDomain(domain: String): Boolean {
+                val d = domain.trim().lowercase()
+                return d == "youtube.com" || d.endsWith(".youtube.com") ||
+                    d == "google.com" || d.endsWith(".google.com")
+            }
+
+            val requiredCookieNames =
+                setOf(
+                    "SID",
+                    "HSID",
+                    "SSID",
+                    "APISID",
+                    "SAPISID",
+                    "__Secure-1PSID",
+                    "__Secure-3PSID",
+                    "LOGIN_INFO",
+                )
+
+            var foundAny = false
+            file.forEachLine { rawLine ->
+                val line = rawLine.trim()
+                if (line.isBlank() || line.startsWith('#')) return@forEachLine
+                val parts = line.split('\t')
+                if (parts.size < 7) return@forEachLine
+
+                val domain = parts[0]
+                if (!looksLikeYouTubeDomain(domain)) return@forEachLine
+
+                val expires = parts[4].toLongOrNull() ?: 0L
+                if (expires in 1..nowEpochSeconds) return@forEachLine
+
+                val name = parts[5]
+                if (name in requiredCookieNames) {
+                    foundAny = true
+                }
+            }
+            return foundAny
+        }
+
+        private suspend fun persistForYtDlpIfPossible(cookiesFile: File) {
+            val profileId = cookieAuthStore.getActiveProfileIdOrNull() ?: return
+            val targetId = CookieTargetCatalog.TARGET_YOUTUBE
+            cookieAuthStore.upsertCookiesFilePath(profileId, targetId, cookiesFile.absolutePath)
+            cookieAuthStore.setEnabledForYtDlp(profileId, targetId, true)
+        }
+
         /**
          * Extract cookies from specified browser using yt-dlp native method.
          * Supported browsers: chrome, firefox, safari, edge, opera, brave, vivaldi, etc.
@@ -64,9 +116,18 @@ class YtDlpCookieExtractor
 
                     result.getOrThrow()
 
-                    // Save the cookies file path
+                    validateNetscapeCookiesFile(cookiesFile)
+                    val loggedIn = hasUsableYouTubeLoginCookies(cookiesFile)
+
                     cookieStore.setCookiesFilePath(cookiesFile.absolutePath)
-                    cookieStore.setLoggedIn(true)
+                    cookieStore.setLoggedIn(loggedIn)
+                    persistForYtDlpIfPossible(cookiesFile)
+
+                    if (!loggedIn) {
+                        throw IllegalStateException(
+                            "Cookies extracted, but no valid YouTube login session cookies were found. Make sure you're logged into YouTube in that browser profile.",
+                        )
+                    }
 
                     cookiesFile
                 }
@@ -84,9 +145,17 @@ class YtDlpCookieExtractor
                     sourceFile.copyTo(destFile, overwrite = true)
 
                     validateNetscapeCookiesFile(destFile)
+                    val loggedIn = hasUsableYouTubeLoginCookies(destFile)
 
                     cookieStore.setCookiesFilePath(destFile.absolutePath)
-                    cookieStore.setLoggedIn(true)
+                    cookieStore.setLoggedIn(loggedIn)
+                    persistForYtDlpIfPossible(destFile)
+
+                    if (!loggedIn) {
+                        throw IllegalStateException(
+                            "Cookies imported, but no valid YouTube login session cookies were found. Export cookies while logged into YouTube, then try again.",
+                        )
+                    }
 
                     destFile
                 }
@@ -108,9 +177,17 @@ class YtDlpCookieExtractor
                     } ?: throw IllegalStateException("Unable to read selected file")
 
                     validateNetscapeCookiesFile(destFile)
+                    val loggedIn = hasUsableYouTubeLoginCookies(destFile)
 
                     cookieStore.setCookiesFilePath(destFile.absolutePath)
-                    cookieStore.setLoggedIn(true)
+                    cookieStore.setLoggedIn(loggedIn)
+                    persistForYtDlpIfPossible(destFile)
+
+                    if (!loggedIn) {
+                        throw IllegalStateException(
+                            "Cookies imported, but no valid YouTube login session cookies were found. Export cookies while logged into YouTube, then try again.",
+                        )
+                    }
 
                     destFile
                 }
@@ -134,8 +211,18 @@ class YtDlpCookieExtractor
                         },
                     )
 
+                    validateNetscapeCookiesFile(destFile)
+                    val loggedIn = hasUsableYouTubeLoginCookies(destFile)
+
                     cookieStore.setCookiesFilePath(destFile.absolutePath)
-                    cookieStore.setLoggedIn(true)
+                    cookieStore.setLoggedIn(loggedIn)
+                    persistForYtDlpIfPossible(destFile)
+
+                    if (!loggedIn) {
+                        throw IllegalStateException(
+                            "Cookies pasted, but no valid YouTube login session cookies were found. Paste/export cookies while logged into YouTube, then try again.",
+                        )
+                    }
 
                     destFile
                 }
@@ -146,6 +233,9 @@ class YtDlpCookieExtractor
          */
         suspend fun clearAllCookies() {
             cookieStore.clear()
+
+            val profileId = cookieAuthStore.getActiveProfileIdOrNull() ?: return
+            cookieAuthStore.clear(profileId, CookieTargetCatalog.TARGET_YOUTUBE)
 
             // Delete cookie files
             withContext(Dispatchers.IO) {

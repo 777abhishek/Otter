@@ -149,6 +149,7 @@ class LoginViewModel
                     }
                 result.onSuccess { file ->
                     cookieAuthStore.upsertCookiesFilePath(pid, tid, file.absolutePath)
+                    cookieAuthStore.setEnabledForYtDlp(pid, tid, true)
                     _successMessage.value = "Cookies saved"
                     onSuccess()
                 }.onFailure { error ->
