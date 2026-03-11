@@ -404,7 +404,15 @@ class DownloaderImpl
                 Intent(appContext, DownloadForegroundService::class.java).apply {
                     action = DownloadForegroundService.ACTION_START
                 }
-            appContext.startService(serviceIntent)
+            kotlin.runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    ContextCompat.startForegroundService(appContext, serviceIntent)
+                } else {
+                    appContext.startService(serviceIntent)
+                }
+            }.onFailure { e ->
+                fileLogger.logError(TAG, "Failed to start DownloadForegroundService", e as? Exception ?: Exception(e))
+            }
 
             val job =
                 scope.launch(context = Dispatchers.Default, start = CoroutineStart.LAZY) {
@@ -494,7 +502,15 @@ class DownloaderImpl
                             Intent(appContext, DownloadForegroundService::class.java).apply {
                                 action = DownloadForegroundService.ACTION_STOP
                             }
-                        appContext.startService(stopIntent)
+                        kotlin.runCatching {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                ContextCompat.startForegroundService(appContext, stopIntent)
+                            } else {
+                                appContext.startService(stopIntent)
+                            }
+                        }.onFailure { e ->
+                            fileLogger.logError(TAG, "Failed to stop DownloadForegroundService", e as? Exception ?: Exception(e))
+                        }
                     }.onFailure { throwable ->
                         if (throwable is YoutubeDL.CanceledException) {
                             fileLogger.log(TAG, "Download canceled: ${info?.title}")
@@ -513,7 +529,15 @@ class DownloaderImpl
                                 Intent(appContext, DownloadForegroundService::class.java).apply {
                                     action = DownloadForegroundService.ACTION_STOP
                                 }
-                            appContext.startService(stopIntent)
+                            kotlin.runCatching {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    ContextCompat.startForegroundService(appContext, stopIntent)
+                                } else {
+                                    appContext.startService(stopIntent)
+                                }
+                            }.onFailure { e ->
+                                fileLogger.logError(TAG, "Failed to stop DownloadForegroundService", e as? Exception ?: Exception(e))
+                            }
                             return@onFailure
                         }
                         fileLogger.logError(TAG, "Download failed: ${info?.title}", throwable)

@@ -356,9 +356,9 @@ fun UpdatesSettings(
                             ModernInfoItem(
                                 icon = { Icon(Icons.Rounded.SystemUpdate, null, modifier = Modifier.size(22.dp)) },
                                 title = "Otter app updates",
-                                subtitle = "Coming soon",
-                                onClick = { },
-                                showArrow = false,
+                                subtitle = "Check, download, and install",
+                                onClick = { navController.navigate("appUpdates") },
+                                showArrow = true,
                                 iconBackgroundColor = iconBgColor,
                                 iconContentColor = iconStyleColor,
                                 iconShape = settings.iconShape,

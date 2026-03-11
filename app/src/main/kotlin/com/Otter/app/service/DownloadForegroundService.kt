@@ -53,10 +53,13 @@ class DownloadForegroundService : Service() {
         flags: Int,
         startId: Int,
     ): Int {
+        // CRITICAL: Must call startForeground() within 5 seconds of startForegroundService()
+        // Do this BEFORE any early returns to avoid ForegroundServiceDidNotStartInTimeException
+        if (!isServiceRunning) {
+            startForegroundServiceInternal()
+        }
+
         when (intent?.action) {
-            ACTION_START -> {
-                startForegroundService()
-            }
             ACTION_STOP -> {
                 stopForegroundService()
             }
@@ -75,13 +78,7 @@ class DownloadForegroundService : Service() {
         }
     }
 
-    private fun startForegroundService() {
-        if (isServiceRunning) return
-
-        // On Android 13+, starting a foreground service requires being able to post the foreground notification.
-        // If the user denied notification permission, do not start to avoid crashing.
-        if (!canPostNotifications()) return
-
+    private fun startForegroundServiceInternal() {
         // Create notification channel
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             val channel =

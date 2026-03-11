@@ -58,9 +58,9 @@ import com.Otter.app.player.PlayerConnectionManager
 import com.Otter.app.ui.components.AudioMiniPlayer
 import com.Otter.app.ui.components.SyncProgressSnackbar
 import com.Otter.app.ui.download.DownloadViewModel
-import com.Otter.app.ui.download.configure.ConfigureFormatsSheet
 import com.Otter.app.ui.download.configure.DownloadDialogViewModel
 import com.Otter.app.ui.download.configure.DownloadErrorSnackbar
+import com.Otter.app.ui.download.configure.ConfigureFormatsSheet
 import com.Otter.app.ui.download.configure.PlaylistSelectionSheet
 import com.Otter.app.ui.navigation.BottomNavItem
 import com.Otter.app.ui.navigation.OtterBottomNavigation
@@ -72,7 +72,9 @@ import com.Otter.app.ui.screens.PlaylistScreen
 import com.Otter.app.ui.screens.WebViewLoginScreen
 import com.Otter.app.ui.screens.settings.AboutSettings
 import com.Otter.app.ui.screens.settings.AppearanceSettingsScreen
+import com.Otter.app.ui.screens.settings.AppUpdatesScreen
 import com.Otter.app.ui.screens.settings.BackupAndRestore
+import com.Otter.app.ui.screens.settings.ChangelogScreen
 import com.Otter.app.ui.screens.settings.ContentSettings
 import com.Otter.app.ui.screens.settings.ContributorsScreen
 import com.Otter.app.ui.screens.settings.CookieTargetsScreen
@@ -532,6 +534,39 @@ fun Otter(onRestartApp: () -> Unit = {}) {
                             UpdatesSettings(
                                 navController = navController,
                                 onBack = { navController.popBackStack() },
+                            )
+                        }
+
+                        composable("appUpdates") {
+                            AppUpdatesScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+
+                        composable("changelog") {
+                            ChangelogScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                                initialTag = null,
+                            )
+                        }
+
+                        composable(
+                            route = "changelog/{tag}",
+                            arguments =
+                                listOf(
+                                    navArgument("tag") {
+                                        type = NavType.StringType
+                                        nullable = false
+                                    },
+                                ),
+                        ) {
+                            val tag = it.arguments?.getString("tag")
+                            ChangelogScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                                initialTag = tag,
                             )
                         }
 

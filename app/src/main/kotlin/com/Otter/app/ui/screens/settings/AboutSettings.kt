@@ -141,6 +141,30 @@ fun AboutSettings(
             items = listOf(
                 {
                     ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.SystemUpdate, null, modifier = Modifier.size(22.dp)) },
+                        title = "App updates",
+                        subtitle = "Check, download, and install",
+                        onClick = { navController.navigate("appUpdates") },
+                        showArrow = true,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
+                    )
+                },
+                {
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.Description, null, modifier = Modifier.size(22.dp)) },
+                        title = "Changelog",
+                        subtitle = "What\'s new",
+                        onClick = { navController.navigate("changelog") },
+                        showArrow = true,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
+                    )
+                },
+                {
+                    ModernInfoItem(
                         icon = { Icon(Icons.Rounded.Code, null, modifier = Modifier.size(22.dp)) },
                         title = "GitHub",
                         subtitle = "Source code and releases",

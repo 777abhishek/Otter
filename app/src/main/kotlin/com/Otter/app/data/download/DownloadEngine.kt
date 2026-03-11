@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.util.Locale
+import kotlin.math.abs
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -64,7 +65,53 @@ class DownloadEngine
             }
         }
 
-        private fun YoutubeDLRequest.addOptionsForVideoDownloads(preferences: DownloadPreferences): YoutubeDLRequest {
+        private fun chooseMergeContainer(
+            preferences: DownloadPreferences,
+            info: VideoInfo,
+            formatSelector: String,
+        ): String? {
+            if (preferences.extractAudio) return null
+            if (preferences.mergeToMkv) return "mkv"
+
+            // Only relevant when merging separate streams.
+            val needsMerge = formatSelector.contains("+") || formatSelector.contains("bestvideo")
+            if (!needsMerge) return null
+
+            // Compatibility preset: keep MP4 when possible.
+            if (preferences.videoFormat == FORMAT_COMPATIBILITY) return "mp4"
+
+            // Try to infer container/codec from the explicitly selected format IDs.
+            val firstSelector = formatSelector.substringBefore("/")
+            val rawIds =
+                firstSelector
+                    .split("+")
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+
+            val selectedFormats = info.formats.orEmpty().filter { it.formatId in rawIds }
+            val selectedVideo = selectedFormats.firstOrNull { it.containsVideo() }
+            val selectedAudio = selectedFormats.firstOrNull { it.isAudioOnly() } ?: selectedFormats.firstOrNull { it.containsAudio() }
+
+            val vcodec = selectedVideo?.vcodec.orEmpty().lowercase(Locale.US)
+            val acodec = selectedAudio?.acodec.orEmpty().lowercase(Locale.US)
+            val vext = selectedVideo?.ext.orEmpty().lowercase(Locale.US)
+
+            // If the selected streams are clearly MP4-compatible, prefer MP4.
+            val looksMp4Compatible =
+                (vext == "mp4" || vext == "m4v") &&
+                    (vcodec.contains("avc") || vcodec.contains("h264")) &&
+                    (acodec.contains("aac") || acodec.contains("mp4a"))
+            if (looksMp4Compatible) return "mp4"
+
+            // Default to MKV because it is robust for VP9/AV1/Opus merges and typically avoids playback issues.
+            return "mkv"
+        }
+
+        private fun YoutubeDLRequest.addOptionsForVideoDownloads(
+            preferences: DownloadPreferences,
+            info: VideoInfo,
+            formatSelector: String,
+        ): YoutubeDLRequest {
             return this.apply {
                 addOption("--add-metadata")
                 addOption("--no-embed-info-json")
@@ -109,9 +156,13 @@ class DownloadEngine
                 }
 
                 // MKV merging
-                if (preferences.mergeToMkv) {
-                    addOption("--remux-video", "mkv")
-                    addOption("--merge-output-format", "mkv")
+                val mergeContainer = chooseMergeContainer(preferences = preferences, info = info, formatSelector = formatSelector)
+                if (mergeContainer != null) {
+                    addOption("--merge-output-format", mergeContainer)
+                    addOption("--remux-video", mergeContainer)
+
+                    // Help ffmpeg create/normalize timestamps to avoid A/V desync in some players.
+                    addOption("--postprocessor-args", "Merger:-fflags +genpts -avoid_negative_ts make_zero")
                 }
 
                 // Thumbnail embedding
@@ -361,7 +412,13 @@ class DownloadEngine
         private fun buildFormatSelector(preferences: DownloadPreferences): String {
             val selected = preferences.formatIdString.trim()
             return when {
-                selected.isBlank() -> "bestvideo*+bestaudio/best"
+                selected.isBlank() -> {
+                    when (preferences.videoFormat) {
+                        FORMAT_COMPATIBILITY ->
+                            "bestvideo[ext=mp4][vcodec*=avc1]+bestaudio[ext=m4a][acodec*=mp4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/bv*+ba/b"
+                        else -> "bestvideo*+bestaudio/best"
+                    }
+                }
                 // If the format string already contains '+' or 'best', assume audio is handled
                 selected.contains("+") || selected.contains("best") -> selected
                 // Audio extraction mode doesn't need video+audio merging
@@ -689,7 +746,11 @@ class DownloadEngine
                         if (task.preferences.extractAudio || info.vcodec == "none") {
                             addOptionsForAudioDownloads(info.id, task.preferences)
                         } else {
-                            addOptionsForVideoDownloads(task.preferences)
+                            addOptionsForVideoDownloads(
+                                preferences = task.preferences,
+                                info = info,
+                                formatSelector = if (task.preferences.formatIdString.isNotBlank()) task.preferences.formatIdString else formatSelector,
+                            )
                         }
 
                         // Common options
@@ -776,7 +837,7 @@ class DownloadEngine
                                         val finalProgress = if (parsedProgress >= 0) parsedProgress else progress / 100f
 
                                         // Only update if progress changed significantly
-                                        if (kotlin.math.abs(finalProgress - lastProgress) > 0.01f || finalProgress == 1f) {
+                                        if (abs(finalProgress - lastProgress) > 0.01f || finalProgress == 1f) {
                                             lastProgress = finalProgress
                                             progressCallback(finalProgress, line)
                                         }
@@ -795,6 +856,7 @@ class DownloadEngine
                     }
                     val downloadedPath = extractDownloadedPath(response.out)
                     fileLogger.log(TAG, "Download completed: ${task.url} -> ${downloadedPath ?: "(unknown path)"}")
+
                     return downloadedPath
                 }
 

@@ -28,9 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.Otter.app.data.download.Format
 import com.Otter.app.data.download.VideoInfo
+import androidx.compose.ui.unit.dp
 import kotlin.math.ln
 import kotlin.math.pow
 
@@ -121,6 +121,9 @@ fun FormatVideoPreview(
 fun SuggestedFormatItem(
     modifier: Modifier = Modifier,
     videoInfo: VideoInfo,
+    bestVideoOnly: Format? = null,
+    bestAudioOnly: Format? = null,
+    hasBestPlusBest: Boolean = false,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -129,30 +132,39 @@ fun SuggestedFormatItem(
             videoInfo.requestedFormats ?: emptyList()
         }
     val duration = videoInfo.duration ?: 0.0
-    val containsVideo = requestedFormats.any { it.containsVideo() }
-    val containsAudio = requestedFormats.any { it.containsAudio() }
-    val title =
-        if (requestedFormats.isEmpty()) {
-            videoInfo.title
-        } else {
-            requestedFormats.joinToString(
-                separator = " + ",
-            ) { it.format.orEmpty() }
-        }
 
-    val totalFileSize =
-        requestedFormats.fold(initial = 0.0) { acc, format ->
-            acc + (format.fileSize ?: format.fileSizeApprox ?: (duration * (format.tbr ?: 0.0) * 125))
+    // Determine which formats to display for size/bitrate calculation
+    val displayFormats = when {
+        requestedFormats.isNotEmpty() -> requestedFormats
+        hasBestPlusBest -> listOfNotNull(bestVideoOnly, bestAudioOnly)
+        else -> emptyList()
+    }
+
+    val containsVideo = true  // Suggested always includes video
+    val containsAudio = true  // Suggested always includes audio
+
+    val title = when {
+        requestedFormats.isNotEmpty() -> requestedFormats.joinToString(separator = " + ") { it.format.orEmpty() }
+        hasBestPlusBest -> {
+            val videoLabel = bestVideoOnly?.let { "${it.height ?: 0}p" } ?: "best"
+            "Best Quality ($videoLabel)"
         }
-    val fileSizeText = totalFileSize.toFileSizeText()
-    val totalTbr = requestedFormats.fold(initial = 0.0) { acc, format -> acc + (format.tbr ?: 0.0) }
-    val tbrText = totalTbr.toBitrateText()
+        else -> "Best Quality (auto)"
+    }
+
+    val totalFileSize = displayFormats.fold(initial = 0.0) { acc, format ->
+        acc + (format.fileSize ?: format.fileSizeApprox ?: (duration * (format.tbr ?: 0.0) * 125))
+    }
+    val fileSizeText = if (totalFileSize > 0) totalFileSize.toFileSizeText() else "Auto"
+    val totalTbr = displayFormats.fold(initial = 0.0) { acc, format -> acc + (format.tbr ?: 0.0) }
+    val tbrText = if (totalTbr > 0) totalTbr.toBitrateText() else ""
     val firstLineText = connectWithDelimiter(fileSizeText, tbrText, delimiter = " ")
 
-    val vcodecText = videoInfo.vcodec?.substringBefore(delimiter = ".") ?: ""
-    val acodecText = videoInfo.acodec?.substringBefore(delimiter = ".") ?: ""
-    val codecText = connectWithBlank(vcodecText, acodecText).run { if (isNotBlank()) "($this)" else this }
-    val secondLineText = connectWithDelimiter(videoInfo.ext, codecText, delimiter = " ").uppercase()
+    val vcodecText = displayFormats.mapNotNull { it.vcodec?.substringBefore(".") }.firstOrNull { it != "none" } ?: ""
+    val acodecText = displayFormats.mapNotNull { it.acodec?.substringBefore(".") }.firstOrNull { it != "none" } ?: ""
+    val codecText = connectWithBlank(vcodecText, acodecText).run { if (isNotBlank()) "($this)" else "" }
+    val extText = displayFormats.mapNotNull { it.ext }.firstOrNull() ?: videoInfo.ext ?: "mp4"
+    val secondLineText = connectWithDelimiter(extText, codecText, delimiter = " ").uppercase()
 
     FormatItemCard(
         modifier = modifier,

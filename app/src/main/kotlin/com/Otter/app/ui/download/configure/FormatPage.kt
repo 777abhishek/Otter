@@ -206,20 +206,22 @@ private fun FormatPageImpl(
 ) {
     if (videoInfo.formats.isNullOrEmpty()) return
 
-    val videoOnlyFormats = videoInfo.formats.filter { it.isVideoOnly() }.reversed()
+    val videoOnlyFormats = videoInfo.formats.filter { it.isVideoOnly() }.sortedByDescending { it.height ?: 0 }
     val audioOnlyFormats = videoInfo.formats.filter { it.isAudioOnly() }.reversed()
     val videoAudioFormats =
         videoInfo.formats
-            .filter {
-                (it.containsVideo() && it.containsAudio()) ||
-                    (it.isVideoOnly() && (it.height ?: 0) > 1080)
-            }
+            .filter { it.containsVideo() && it.containsAudio() }
             .sortedByDescending { it.height ?: 0 }
 
     val duration = videoInfo.duration ?: 0.0
 
+    // Best video + best audio for suggested "Best + Best" option
+    val bestVideoOnly = videoOnlyFormats.firstOrNull()
+    val bestAudioOnly = audioOnlyFormats.firstOrNull()
+    val hasBestPlusBest = bestVideoOnly != null && bestAudioOnly != null
+
     val isSuggestedFormatAvailable =
-        !videoInfo.requestedFormats.isNullOrEmpty() || !videoInfo.requestedDownloads.isNullOrEmpty()
+        !videoInfo.requestedFormats.isNullOrEmpty() || !videoInfo.requestedDownloads.isNullOrEmpty() || hasBestPlusBest
 
     var isSuggestedFormatSelected by remember { mutableStateOf(isSuggestedFormatAvailable) }
 
@@ -263,20 +265,28 @@ private fun FormatPageImpl(
     val selectedAutoCaptions = remember { mutableStateListOf<String>() }
 
     // Format list derived from selections
+    // Key insight from Seal: empty formatList = yt-dlp uses "bestvideo*+bestaudio/best" default selector
     val formatList: List<Format> by remember {
         androidx.compose.runtime.derivedStateOf {
-            mutableListOf<Format>().apply {
-                if (isSuggestedFormatSelected) {
-                    videoInfo.requestedFormats?.let { addAll(it) }
-                        ?: videoInfo.requestedDownloads?.forEach {
-                            it.requestedFormats?.let { addAll(it) }
-                        }
-                } else {
+            if (isSuggestedFormatSelected) {
+                // Use yt-dlp's requestedFormats if available, otherwise empty list for default selector
+                videoInfo.requestedFormats
+                    ?: videoInfo.requestedDownloads?.flatMap { it.requestedFormats ?: emptyList() }
+                    ?: emptyList()
+            } else {
+                mutableListOf<Format>().apply {
                     selectedAudioOnlyFormats.forEach { index ->
                         add(audioOnlyFormats.elementAt(index))
                     }
                     videoAudioFormats.getOrNull(selectedVideoAudioFormat)?.let { add(it) }
-                    videoOnlyFormats.getOrNull(selectedVideoOnlyFormat)?.let { add(it) }
+                    // Video-only format needs audio merge - auto-add best audio if no audio selected
+                    videoOnlyFormats.getOrNull(selectedVideoOnlyFormat)?.let { videoFormat ->
+                        add(videoFormat)
+                        // Auto-add best audio for merging if user hasn't selected specific audio
+                        if (selectedAudioOnlyFormats.isEmpty()) {
+                            bestAudioOnly?.let { add(it) }
+                        }
+                    }
                 }
             }
         }
@@ -389,24 +399,40 @@ private fun FormatPageImpl(
                 FormatTab.Combined ->
                     CombinedTab(
                         videoAudioFormats = videoAudioFormats,
+                        videoOnlyFormats = videoOnlyFormats,
                         duration = duration,
                         isSuggestedFormatAvailable = isSuggestedFormatAvailable,
                         isSuggestedFormatSelected = isSuggestedFormatSelected,
                         selectedVideoAudioFormat = selectedVideoAudioFormat,
+                        selectedVideoOnlyFormat = selectedVideoOnlyFormat,
                         videoInfo = videoInfo,
+                        bestVideoOnly = bestVideoOnly,
+                        bestAudioOnly = bestAudioOnly,
+                        hasBestPlusBest = hasBestPlusBest,
                         onSuggestedClick = {
                             isSuggestedFormatSelected = true
                             selectedAudioOnlyFormats.clear()
                             selectedVideoAudioFormat = NOT_SELECTED
                             selectedVideoOnlyFormat = NOT_SELECTED
                         },
-                        onFormatClick = { index ->
+                        onVideoAudioFormatClick = { index ->
                             selectedVideoAudioFormat =
                                 if (selectedVideoAudioFormat == index) {
                                     NOT_SELECTED
                                 } else {
                                     selectedAudioOnlyFormats.clear()
                                     selectedVideoOnlyFormat = NOT_SELECTED
+                                    isSuggestedFormatSelected = false
+                                    index
+                                }
+                        },
+                        onVideoOnlyFormatClick = { index ->
+                            selectedVideoOnlyFormat =
+                                if (selectedVideoOnlyFormat == index) {
+                                    NOT_SELECTED
+                                } else {
+                                    selectedAudioOnlyFormats.clear()
+                                    selectedVideoAudioFormat = NOT_SELECTED
                                     isSuggestedFormatSelected = false
                                     index
                                 }

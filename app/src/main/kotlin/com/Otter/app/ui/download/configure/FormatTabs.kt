@@ -38,16 +38,22 @@ import com.Otter.app.util.SubtitleFormat
 @Composable
 internal fun CombinedTab(
     videoAudioFormats: List<Format>,
+    videoOnlyFormats: List<Format>,
     duration: Double,
     isSuggestedFormatAvailable: Boolean,
     isSuggestedFormatSelected: Boolean,
     selectedVideoAudioFormat: Int,
+    selectedVideoOnlyFormat: Int,
     videoInfo: VideoInfo,
+    bestVideoOnly: Format?,
+    bestAudioOnly: Format?,
+    hasBestPlusBest: Boolean,
     onSuggestedClick: () -> Unit,
-    onFormatClick: (Int) -> Unit,
+    onVideoAudioFormatClick: (Int) -> Unit,
+    onVideoOnlyFormatClick: (Int) -> Unit,
     onLongClick: (String?) -> Unit,
 ) {
-    if (videoAudioFormats.isEmpty() && !isSuggestedFormatAvailable) {
+    if (videoAudioFormats.isEmpty() && videoOnlyFormats.isEmpty() && !isSuggestedFormatAvailable) {
         EmptyTabMessage(text = "No combined formats available")
         return
     }
@@ -58,6 +64,7 @@ internal fun CombinedTab(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(12.dp),
     ) {
+        // Suggested section - Best quality option (yt-dlp auto-selects best)
         if (isSuggestedFormatAvailable) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 FormatSubtitle(
@@ -68,16 +75,41 @@ internal fun CombinedTab(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 SuggestedFormatItem(
                     videoInfo = videoInfo,
+                    bestVideoOnly = bestVideoOnly,
+                    bestAudioOnly = bestAudioOnly,
+                    hasBestPlusBest = hasBestPlusBest,
                     selected = isSuggestedFormatSelected,
                     onClick = onSuggestedClick,
                 )
             }
         }
 
+        // Video-only formats that will be merged with best audio (higher quality options)
+        if (videoOnlyFormats.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                FormatSubtitle(
+                    text = "Video (merges with audio)",
+                    modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                )
+            }
+            itemsIndexed(videoOnlyFormats) { index, formatInfo ->
+                FormatItem(
+                    formatInfo = formatInfo,
+                    duration = duration,
+                    selected = selectedVideoOnlyFormat == index,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    outlineColor = MaterialTheme.colorScheme.primary,
+                    onLongClick = { onLongClick(formatInfo.url) },
+                    onClick = { onVideoOnlyFormatClick(index) },
+                )
+            }
+        }
+
+        // Pre-merged Video + Audio formats (single file with both streams - usually lower quality)
         if (videoAudioFormats.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 FormatSubtitle(
-                    text = "Video + Audio",
+                    text = "Video + Audio (pre-merged)",
                     modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                 )
             }
@@ -86,8 +118,10 @@ internal fun CombinedTab(
                     formatInfo = formatInfo,
                     duration = duration,
                     selected = selectedVideoAudioFormat == index,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    outlineColor = MaterialTheme.colorScheme.secondary,
                     onLongClick = { onLongClick(formatInfo.url) },
-                    onClick = { onFormatClick(index) },
+                    onClick = { onVideoAudioFormatClick(index) },
                 )
             }
         }
