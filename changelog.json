@@ -1,6 +1,44 @@
 {
   "releases": [
     {
+      "version": "2.0.2",
+      "versionCode": 4,
+      "date": "2026-03-24",
+      "type": "patch",
+      "highlights": [
+        "Fixed streaming auto-start behavior",
+        "Resolved playlist skipping issues",
+        "Improved update checker reliability",
+        "UI polish and improvements"
+      ],
+      "categories": {
+        "fixes": [
+          {
+            "title": "Streaming auto-start fix",
+            "description": "Fixed streaming playback not auto-starting when selected",
+            "impact": "high"
+          },
+          {
+            "title": "Playlist skipping resolved",
+            "description": "Fixed issues with playlist navigation and item skipping",
+            "impact": "high"
+          },
+          {
+            "title": "Update checker improvements",
+            "description": "Enhanced update check reliability and error handling",
+            "impact": "medium"
+          }
+        ],
+        "improvements": [
+          {
+            "title": "UI polish",
+            "description": "Various UI improvements and visual refinements",
+            "impact": "low"
+          }
+        ]
+      }
+    },
+    {
       "version": "2.0.1",
       "versionCode": 3,
       "date": "2026-03-24",
