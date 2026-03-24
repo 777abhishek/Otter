@@ -196,17 +196,8 @@ class PlayerConnectionManager
                                     controller.play()
                                 }
                             }
-
-                            androidx.media3.common.Player.STATE_ENDED -> {
-                                // As a fallback, if the queue suggests we have a next item but playback
-                                // stopped, request the service to advance. The service also handles this,
-                                // but this keeps UI-driven sessions from stalling.
-                                val queueSize = _queue.value.size
-                                val index = _queueIndex.value
-                                if (queueSize > 0 && index < queueSize - 1) {
-                                    playNext()
-                                }
-                            }
+                            // STATE_ENDED is handled by PlayerService - don't duplicate playNext() here
+                            // to avoid double-advancing in playlist
                         }
                     }
 
@@ -227,6 +218,16 @@ class PlayerConnectionManager
                         newPosition: androidx.media3.common.Player.PositionInfo,
                         reason: Int,
                     ) {
+                        // Log for debugging
+                        android.util.Log.d("PlayerConnectionManager", "onPositionDiscontinuity reason=$reason oldPos=${oldPosition.positionMs} newPos=${newPosition.positionMs}")
+                        
+                        // AUTO_TRANSITION (reason=0) happens when ExoPlayer auto-advances to next media item
+                        // This should NOT happen for the first video - only after STATE_ENDED
+                        if (reason == androidx.media3.common.Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                            // Let STATE_ENDED handle queue progression, don't double-advance here
+                            android.util.Log.w("PlayerConnectionManager", "AUTO_TRANSITION detected - ignoring to prevent double-advance")
+                        }
+                        
                         updatePosition()
                     }
 

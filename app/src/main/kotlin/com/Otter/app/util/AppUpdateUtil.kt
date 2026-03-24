@@ -1,9 +1,12 @@
 package com.Otter.app.util
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,14 +40,28 @@ object AppUpdateUtil {
 
     suspend fun fetchLatestRelease(): Release? =
         withContext(Dispatchers.IO) {
-            val req =
-                Request.Builder()
-                    .url("https://api.github.com/repos/$OWNER/$REPO/releases/latest")
-                    .build()
-            val resp = client.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext null
-            val json = resp.body?.string().orEmpty()
-            parseRelease(JSONObject(json))
+            try {
+                val req =
+                    Request.Builder()
+                        .url("https://api.github.com/repos/$OWNER/$REPO/releases/latest")
+                        .header("Accept", "application/vnd.github+json")
+                        .header("X-GitHub-Api-Version", "2022-11-28")
+                        .build()
+                val resp = client.newCall(req).execute()
+                if (!resp.isSuccessful) {
+                    android.util.Log.e("AppUpdateUtil", "GitHub API error: ${resp.code} ${resp.message}")
+                    return@withContext null
+                }
+                val json = resp.body?.string().orEmpty()
+                if (json.isBlank()) {
+                    android.util.Log.e("AppUpdateUtil", "GitHub API empty response")
+                    return@withContext null
+                }
+                parseRelease(JSONObject(json))
+            } catch (e: Exception) {
+                android.util.Log.e("AppUpdateUtil", "Failed to fetch release: ${e.message}", e)
+                null
+            }
         }
 
     suspend fun fetchReleases(limit: Int = 10): List<Release> =
@@ -52,6 +69,8 @@ object AppUpdateUtil {
             val req =
                 Request.Builder()
                     .url("https://api.github.com/repos/$OWNER/$REPO/releases?per_page=$limit")
+                    .header("Accept", "application/vnd.github+json")
+                    .header("X-GitHub-Api-Version", "2022-11-28")
                     .build()
             val resp = client.newCall(req).execute()
             if (!resp.isSuccessful) return@withContext emptyList()
@@ -132,10 +151,20 @@ object AppUpdateUtil {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            clipData = ClipData.newUri(context.contentResolver, "APK", uri)
+        }
+    }
+
+    fun canRequestPackageInstalls(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            true
         }
     }
 
     fun tryStartInstall(context: Context, apkFile: File): Boolean {
+        if (!canRequestPackageInstalls(context)) return false
         val intent = buildInstallIntent(context, apkFile)
         return try {
             context.startActivity(intent)
@@ -149,8 +178,8 @@ object AppUpdateUtil {
 
     fun openUnknownSourcesSettings(context: Context): Boolean {
         return try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
                     data = Uri.parse("package:${context.packageName}")
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }

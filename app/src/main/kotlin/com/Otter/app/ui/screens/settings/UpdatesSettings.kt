@@ -77,6 +77,7 @@ import com.Otter.app.util.PreferenceUtil.getString
 import com.Otter.app.util.UpdateUtil
 import com.Otter.app.util.YT_DLP_VERSION
 import com.Otter.app.util.AppUpdateUtil
+import com.Otter.app.util.ReleaseNotesUtil
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -155,18 +156,49 @@ private fun WavyProgressBar(
     }
 }
 
+@Composable
+private fun NotesSection(
+    title: String,
+    lines: List<String>,
+) {
+    if (lines.isEmpty()) return
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        lines.forEach { line ->
+            Text(
+                text = "• $line",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun FullScreenLoadingOverlay(
     title: String,
     subtitle: String,
+    currentVersion: String? = null,
+    latestVersion: String? = null,
+    releaseNotes: ReleaseNotesUtil.ParsedNotes? = null,
+    isChecking: Boolean = false,
 ) {
     // True fullscreen loading matching app theme
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 24.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -190,6 +222,57 @@ private fun FullScreenLoadingOverlay(
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             textAlign = TextAlign.Center,
         )
+
+        // Show version info and release notes during checking
+        if (isChecking && (currentVersion != null || latestVersion != null)) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    // Version info
+                    if (currentVersion != null) {
+                        Text(
+                            text = "Current version: $currentVersion",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    if (latestVersion != null) {
+                        Text(
+                            text = "Latest version: $latestVersion",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+
+                    // Release notes
+                    if (releaseNotes != null && (
+                        releaseNotes.fixes.isNotEmpty() ||
+                        releaseNotes.improvements.isNotEmpty() ||
+                        releaseNotes.patches.isNotEmpty() ||
+                        releaseNotes.other.isNotEmpty())
+                    ) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Release notes:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        NotesSection(title = "Fixes", lines = releaseNotes.fixes)
+                        NotesSection(title = "Improvements", lines = releaseNotes.improvements)
+                        NotesSection(title = "Patches", lines = releaseNotes.patches)
+                        NotesSection(title = "Other", lines = releaseNotes.other)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -232,13 +315,6 @@ fun UpdatesSettings(
     val scope = rememberCoroutineScope()
 
     var showYtdlpDialog by remember { mutableStateOf(false) }
-    var isUpdatingYtdlp by remember { mutableStateOf(false) }
-    var isUpdatingNewPipe by remember { mutableStateOf(false) }
-    var isCheckingOtter by remember { mutableStateOf(false) }
-    var isDownloadingOtter by remember { mutableStateOf(false) }
-    var otterDownloadProgress by remember { mutableStateOf(0f) }
-    var latestOtterRelease by remember { mutableStateOf<AppUpdateUtil.Release?>(null) }
-    var otterError by remember { mutableStateOf<String?>(null) }
 
     var ytdlpVersion by remember {
         mutableStateOf(
@@ -267,6 +343,14 @@ fun UpdatesSettings(
         )
     }
 
+    // Last Otter check time
+    var lastOtterCheckTime by remember {
+        mutableStateOf(
+            context.getSharedPreferences("update_prefs", android.content.Context.MODE_PRIVATE)
+                .getLong("last_otter_check", 0L),
+        )
+    }
+
     fun formatLastUpdateTime(timestamp: Long): String {
         if (timestamp == 0L) return "Tap to check for updates"
         val now = System.currentTimeMillis()
@@ -279,491 +363,273 @@ fun UpdatesSettings(
         }
     }
 
-    fun saveLastUpdateTime() {
-        val now = System.currentTimeMillis()
-        lastYtdlpUpdateTime = now
-        context.getSharedPreferences("update_prefs", android.content.Context.MODE_PRIVATE)
-            .edit()
-            .putLong("last_ytdlp_update", now)
-            .apply()
-    }
-
-    fun saveNewPipeUpdateTime() {
-        val now = System.currentTimeMillis()
-        lastNewPipeUpdateTime = now
-        context.getSharedPreferences("update_prefs", android.content.Context.MODE_PRIVATE)
-            .edit()
-            .putLong("last_newpipe_update", now)
-            .apply()
-    }
-
-    val isUpdating = isUpdatingYtdlp || isUpdatingNewPipe || isCheckingOtter || isDownloadingOtter
-
-    // Version comparison functions
-    fun normalizeVersion(v: String): String = v.trim().removePrefix("v").removePrefix("V")
-
-    fun compareVersions(a: String, b: String): Int {
-        val partsA = a.split(".").map { it.toIntOrNull() ?: 0 }
-        val partsB = b.split(".").map { it.toIntOrNull() ?: 0 }
-        for (i in 0 until maxOf(partsA.size, partsB.size)) {
-            val pa = partsA.getOrElse(i) { 0 }
-            val pb = partsB.getOrElse(i) { 0 }
-            if (pa != pb) return pa.compareTo(pb)
-        }
-        return 0
-    }
-
-    // Otter version comparison
-    val currentOtterVersion = remember { normalizeVersion(BuildConfig.VERSION_NAME) }
-    val latestOtterVersion = remember(latestOtterRelease?.tagName) { normalizeVersion(latestOtterRelease?.tagName.orEmpty()) }
-    val isOtterUpdateAvailable = remember(currentOtterVersion, latestOtterVersion) {
-        latestOtterVersion.isNotBlank() && compareVersions(latestOtterVersion, currentOtterVersion) > 0
-    }
-
-    fun checkOtterUpdates() {
-        if (isCheckingOtter) return
-        scope.launch {
-            isCheckingOtter = true
-            otterError = null
-            runCatching {
-                val release = withContext(Dispatchers.IO) { AppUpdateUtil.fetchLatestRelease() }
-                latestOtterRelease = release
-            }.onFailure {
-                otterError = it.message ?: "Failed to check updates"
-            }
-            isCheckingOtter = false
-        }
-    }
-
-    fun downloadOtterUpdate() {
-        val release = latestOtterRelease ?: return
-        val asset = AppUpdateUtil.pickApkAsset(release)
-        if (asset == null) {
-            otterError = "No APK found in release"
-            return
-        }
-        if (isDownloadingOtter) return
-        scope.launch {
-            isDownloadingOtter = true
-            otterError = null
-            otterDownloadProgress = 0f
-            val file = withContext(Dispatchers.IO) {
-                AppUpdateUtil.downloadAssetToCache(context, asset) { downloaded, total ->
-                    otterDownloadProgress = if (total > 0) (downloaded.toFloat() / total.toFloat()) else 0f
-                }
-            }
-            isDownloadingOtter = false
-            if (file == null) {
-                otterError = "Failed to download APK"
-                return@launch
-            }
-            val installed = AppUpdateUtil.tryStartInstall(context, file)
-            if (!installed) {
-                AppUpdateUtil.openUnknownSourcesSettings(context)
-            }
-        }
-    }
-
-    fun openOtterReleases() {
-        val tag = latestOtterRelease?.tagName
-        val url = if (!tag.isNullOrBlank()) {
-            "https://github.com/777abhishek/Otter/releases/tag/$tag"
-        } else {
-            "https://github.com/777abhishek/Otter/releases"
-        }
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        // Header with back button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Header with back button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (onBack != null) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                        )
-                    }
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                    )
                 }
-                Text(
-                    text = "Updates",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 4.dp),
-                )
             }
-
-            // Streaming tools (yt-dlp / NewPipe) section - compact
-            Material3ExpressiveSettingsGroup(
-                modifier = Modifier.fillMaxWidth(),
-                items =
-                    listOf(
-                        {
-                            ModernInfoItem(
-                                icon = { Icon(Icons.Rounded.SystemUpdate, null, modifier = Modifier.size(22.dp)) },
-                                title = "Otter",
-                                subtitle = when {
-                                    isCheckingOtter -> "Checking for updates..."
-                                    isDownloadingOtter -> "Downloading ${(otterDownloadProgress * 100).toInt()}%"
-                                    isOtterUpdateAvailable -> "Update available: ${latestOtterRelease?.tagName}"
-                                    latestOtterRelease != null -> "Up to date: ${BuildConfig.VERSION_NAME}"
-                                    else -> "Tap to check for updates"
-                                },
-                                onClick = {
-                                    when {
-                                        isCheckingOtter || isDownloadingOtter -> {}
-                                        isOtterUpdateAvailable && latestOtterRelease != null -> downloadOtterUpdate()
-                                        else -> checkOtterUpdates()
-                                    }
-                                },
-                                showArrow = false,
-                                iconBackgroundColor = iconBgColor,
-                                iconContentColor = iconStyleColor,
-                                iconShape = settings.iconShape,
-                                trailingContent = {
-                                    when {
-                                        isCheckingOtter || isDownloadingOtter -> CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                        isOtterUpdateAvailable -> Icon(
-                                            imageVector = Icons.Rounded.Download,
-                                            contentDescription = "Download",
-                                            modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                        else -> Icon(
-                                            imageVector = Icons.Filled.Refresh,
-                                            contentDescription = "Check",
-                                            modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                },
-                            )
-                        },
-                        {
-                            ModernInfoItem(
-                                icon = { Icon(Icons.Rounded.NewReleases, null, modifier = Modifier.size(22.dp)) },
-                                title = "yt-dlp",
-                                subtitle = "$ytdlpVersion • ${formatLastUpdateTime(lastYtdlpUpdateTime)}",
-                                onClick = {
-                                    if (isUpdatingYtdlp) return@ModernInfoItem
-                                    scope.launch {
-                                        runCatching {
-                                            isUpdatingYtdlp = true
-                                            withContext(Dispatchers.IO) {
-                                                UpdateUtil.updateYtDlp()
-                                            }
-                                            ytdlpVersion =
-                                                YT_DLP_VERSION.getString().ifBlank {
-                                                    YoutubeDL.getInstance().version(context.applicationContext) ?: ytdlpVersion
-                                                }
-                                            saveLastUpdateTime()
-                                        }.onFailure {
-                                            it.printStackTrace()
-                                        }.also {
-                                            isUpdatingYtdlp = false
-                                        }
-                                    }
-                                },
-                                showArrow = false,
-                                iconBackgroundColor = iconBgColor,
-                                iconContentColor = iconStyleColor,
-                                iconShape = settings.iconShape,
-                                trailingContent = {
-                                    if (isUpdatingYtdlp) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Filled.Refresh,
-                                            contentDescription = "Update",
-                                            modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                },
-                            )
-                        },
-                        {
-                            ModernInfoItem(
-                                icon = { Icon(Icons.Rounded.Extension, null, modifier = Modifier.size(22.dp)) },
-                                title = "NewPipe extractor",
-                                subtitle = "$newpipeVersion • ${formatLastUpdateTime(lastNewPipeUpdateTime)}",
-                                onClick = {
-                                    if (isUpdatingNewPipe) return@ModernInfoItem
-                                    scope.launch {
-                                        runCatching {
-                                            isUpdatingNewPipe = true
-                                            val latestVersion =
-                                                withContext(Dispatchers.IO) {
-                                                    UpdateUtil.checkNewPipeUpdates()
-                                                }
-                                            if (latestVersion != null) {
-                                                newpipeVersion = latestVersion
-                                                PreferenceUtil.setStringValue(NEWPIPE_VERSION, latestVersion)
-                                                saveNewPipeUpdateTime()
-                                            }
-                                        }.onFailure {
-                                            it.printStackTrace()
-                                        }.also {
-                                            isUpdatingNewPipe = false
-                                        }
-                                    }
-                                },
-                                showArrow = false,
-                                iconBackgroundColor = iconBgColor,
-                                iconContentColor = iconStyleColor,
-                                iconShape = settings.iconShape,
-                                trailingContent = {
-                                    if (isUpdatingNewPipe) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(20.dp),
-                                            strokeWidth = 2.dp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Filled.Refresh,
-                                            contentDescription = "Update",
-                                            modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                },
-                            )
-                        },
-                        {
-                            ModernInfoItem(
-                                icon = { Icon(Icons.Rounded.SystemUpdate, null, modifier = Modifier.size(22.dp)) },
-                                title = "yt-dlp update settings",
-                                subtitle = "Channel & interval",
-                                onClick = { showYtdlpDialog = true },
-                                showArrow = true,
-                                iconBackgroundColor = iconBgColor,
-                                iconContentColor = iconStyleColor,
-                                iconShape = settings.iconShape,
-                            )
-                        },
-                    ),
-            )
-
-            // Automation
-            Material3ExpressiveSettingsGroup(
-                modifier = Modifier.fillMaxWidth(),
-                items =
-                    listOf(
-                        {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    ModernInfoItem(
-                                        icon = { Icon(Icons.Rounded.Update, null, modifier = Modifier.size(22.dp)) },
-                                        title = "Auto updates & checks",
-                                        subtitle = "Run in background even when app is closed",
-                                        iconBackgroundColor = iconBgColor,
-                                        iconContentColor = iconStyleColor,
-                                        iconShape = settings.iconShape,
-                                    )
-                                }
-                                Switch(
-                                    checked = settings.updatesAutomationEnabled,
-                                    onCheckedChange = { viewModel.setUpdatesAutomationEnabled(it) },
-                                    modifier = Modifier.padding(end = 20.dp),
-                                )
-                            }
-                        },
-                        {
-                            val enabled = settings.updatesAutomationEnabled
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    ModernInfoItem(
-                                        icon = { Icon(Icons.Rounded.Schedule, null, modifier = Modifier.size(22.dp)) },
-                                        title = "Check interval",
-                                        subtitle = if (settings.updatesAutomationInterval == UpdatesAutomationInterval.WEEKLY) "Weekly" else "Daily",
-                                        iconBackgroundColor = iconBgColor,
-                                        iconContentColor = iconStyleColor,
-                                        iconShape = settings.iconShape,
-                                    )
-                                }
-                                TextButton(
-                                    enabled = enabled,
-                                    onClick = {
-                                        val next =
-                                            if (settings.updatesAutomationInterval == UpdatesAutomationInterval.DAILY) UpdatesAutomationInterval.WEEKLY
-                                            else UpdatesAutomationInterval.DAILY
-                                        viewModel.setUpdatesAutomationInterval(next)
-                                    },
-                                    modifier = Modifier.padding(end = 12.dp),
-                                ) {
-                                    Text(if (settings.updatesAutomationInterval == UpdatesAutomationInterval.WEEKLY) "Weekly" else "Daily")
-                                }
-                            }
-                        },
-                        {
-                            val enabled = settings.updatesAutomationEnabled
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    ModernInfoItem(
-                                        icon = { Icon(Icons.Rounded.Notifications, null, modifier = Modifier.size(22.dp)) },
-                                        title = "Notify updates",
-                                        subtitle = "Show notification when new version is found",
-                                        iconBackgroundColor = iconBgColor,
-                                        iconContentColor = iconStyleColor,
-                                        iconShape = settings.iconShape,
-                                    )
-                                }
-                                Switch(
-                                    checked = settings.updatesAutomationNotify,
-                                    onCheckedChange = { viewModel.setUpdatesAutomationNotify(it) },
-                                    enabled = enabled,
-                                    modifier = Modifier.padding(end = 20.dp),
-                                )
-                            }
-                        },
-                        {
-                            val enabled = settings.updatesAutomationEnabled
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    ModernInfoItem(
-                                        icon = { Icon(Icons.Rounded.Download, null, modifier = Modifier.size(22.dp)) },
-                                        title = "Auto download Otter APK",
-                                        subtitle = "Downloads in background (install still needs tap)",
-                                        iconBackgroundColor = iconBgColor,
-                                        iconContentColor = iconStyleColor,
-                                        iconShape = settings.iconShape,
-                                    )
-                                }
-                                Switch(
-                                    checked = settings.updatesAutomationAutoDownloadApk,
-                                    onCheckedChange = { viewModel.setUpdatesAutomationAutoDownloadApk(it) },
-                                    enabled = enabled,
-                                    modifier = Modifier.padding(end = 20.dp),
-                                )
-                            }
-                        },
-                        {
-                            val enabled = settings.updatesAutomationEnabled
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    ModernInfoItem(
-                                        icon = { Icon(Icons.Rounded.NewReleases, null, modifier = Modifier.size(22.dp)) },
-                                        title = "Auto update yt-dlp",
-                                        subtitle = "Keeps yt-dlp updated automatically",
-                                        iconBackgroundColor = iconBgColor,
-                                        iconContentColor = iconStyleColor,
-                                        iconShape = settings.iconShape,
-                                    )
-                                }
-                                Switch(
-                                    checked = settings.updatesAutomationAutoUpdateYtDlp,
-                                    onCheckedChange = { viewModel.setUpdatesAutomationAutoUpdateYtDlp(it) },
-                                    enabled = enabled,
-                                    modifier = Modifier.padding(end = 20.dp),
-                                )
-                            }
-                        },
-                        {
-                            val enabled = settings.updatesAutomationEnabled
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    ModernInfoItem(
-                                        icon = { Icon(Icons.Rounded.Extension, null, modifier = Modifier.size(22.dp)) },
-                                        title = "Auto check NewPipe",
-                                        subtitle = "Checks extractor updates automatically",
-                                        iconBackgroundColor = iconBgColor,
-                                        iconContentColor = iconStyleColor,
-                                        iconShape = settings.iconShape,
-                                    )
-                                }
-                                Switch(
-                                    checked = settings.updatesAutomationAutoCheckNewPipe,
-                                    onCheckedChange = { viewModel.setUpdatesAutomationAutoCheckNewPipe(it) },
-                                    enabled = enabled,
-                                    modifier = Modifier.padding(end = 20.dp),
-                                )
-                            }
-                        },
-                        {
-                            val enabled = settings.updatesAutomationEnabled
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    ModernInfoItem(
-                                        icon = { Icon(Icons.Rounded.DeleteSweep, null, modifier = Modifier.size(22.dp)) },
-                                        title = "Auto clear cache",
-                                        subtitle = "Clears app cache automatically",
-                                        iconBackgroundColor = iconBgColor,
-                                        iconContentColor = iconStyleColor,
-                                        iconShape = settings.iconShape,
-                                    )
-                                }
-                                Switch(
-                                    checked = settings.updatesAutomationAutoClearCache,
-                                    onCheckedChange = { viewModel.setUpdatesAutomationAutoClearCache(it) },
-                                    enabled = enabled,
-                                    modifier = Modifier.padding(end = 20.dp),
-                                )
-                            }
-                        },
-                    ),
-            )
-
-            Spacer(modifier = Modifier.height(80.dp))
-        }
-
-        // Full-screen overlay when updating
-        if (isUpdating) {
-            FullScreenLoadingOverlay(
-                title = when {
-                    isCheckingOtter -> "Checking for Otter updates"
-                    isDownloadingOtter -> "Downloading Otter update"
-                    isUpdatingYtdlp -> "Updating yt-dlp"
-                    isUpdatingNewPipe -> "Updating NewPipe"
-                    else -> "Updating"
-                },
-                subtitle = when {
-                    isDownloadingOtter -> "${(otterDownloadProgress * 100).toInt()}% complete"
-                    else -> "Please wait..."
-                },
+            Text(
+                text = "Updates",
+                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(start = 4.dp),
             )
         }
+
+        // Update items section
+        Material3ExpressiveSettingsGroup(
+            modifier = Modifier.fillMaxWidth(),
+            items =
+                listOf(
+                    {
+                        ModernInfoItem(
+                            icon = { Icon(Icons.Rounded.SystemUpdate, null, modifier = Modifier.size(22.dp)) },
+                            title = "Otter",
+                            subtitle = "${BuildConfig.VERSION_NAME} • ${formatLastUpdateTime(lastOtterCheckTime)}",
+                            onClick = { navController.navigate("update_checker") },
+                            showArrow = true,
+                            iconBackgroundColor = iconBgColor,
+                            iconContentColor = iconStyleColor,
+                            iconShape = settings.iconShape,
+                        )
+                    },
+                    {
+                        ModernInfoItem(
+                            icon = { Icon(Icons.Rounded.NewReleases, null, modifier = Modifier.size(22.dp)) },
+                            title = "yt-dlp",
+                            subtitle = "$ytdlpVersion • ${formatLastUpdateTime(lastYtdlpUpdateTime)}",
+                            onClick = { navController.navigate("update_checker_ytdlp") },
+                            showArrow = true,
+                            iconBackgroundColor = iconBgColor,
+                            iconContentColor = iconStyleColor,
+                            iconShape = settings.iconShape,
+                        )
+                    },
+                    {
+                        ModernInfoItem(
+                            icon = { Icon(Icons.Rounded.Extension, null, modifier = Modifier.size(22.dp)) },
+                            title = "NewPipe extractor",
+                            subtitle = "$newpipeVersion • ${formatLastUpdateTime(lastNewPipeUpdateTime)}",
+                            onClick = { navController.navigate("update_checker_newpipe") },
+                            showArrow = true,
+                            iconBackgroundColor = iconBgColor,
+                            iconContentColor = iconStyleColor,
+                            iconShape = settings.iconShape,
+                        )
+                    },
+                    {
+                        ModernInfoItem(
+                            icon = { Icon(Icons.Rounded.SystemUpdate, null, modifier = Modifier.size(22.dp)) },
+                            title = "yt-dlp update settings",
+                            subtitle = "Channel & interval",
+                            onClick = { showYtdlpDialog = true },
+                            showArrow = true,
+                            iconBackgroundColor = iconBgColor,
+                            iconContentColor = iconStyleColor,
+                            iconShape = settings.iconShape,
+                        )
+                    },
+                ),
+        )
+
+        // Automation settings section
+        Material3ExpressiveSettingsGroup(
+            modifier = Modifier.fillMaxWidth(),
+            items =
+                listOf(
+                    {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                ModernInfoItem(
+                                    icon = { Icon(Icons.Rounded.Update, null, modifier = Modifier.size(22.dp)) },
+                                    title = "Auto updates & checks",
+                                    subtitle = "Run in background even when app is closed",
+                                    iconBackgroundColor = iconBgColor,
+                                    iconContentColor = iconStyleColor,
+                                    iconShape = settings.iconShape,
+                                )
+                            }
+                            Switch(
+                                checked = settings.updatesAutomationEnabled,
+                                onCheckedChange = { viewModel.setUpdatesAutomationEnabled(it) },
+                                modifier = Modifier.padding(end = 20.dp),
+                            )
+                        }
+                    },
+                    {
+                        val enabled = settings.updatesAutomationEnabled
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                ModernInfoItem(
+                                    icon = { Icon(Icons.Rounded.Schedule, null, modifier = Modifier.size(22.dp)) },
+                                    title = "Check interval",
+                                    subtitle = if (settings.updatesAutomationInterval == UpdatesAutomationInterval.WEEKLY) "Weekly" else "Daily",
+                                    iconBackgroundColor = iconBgColor,
+                                    iconContentColor = iconStyleColor,
+                                    iconShape = settings.iconShape,
+                                )
+                            }
+                            TextButton(
+                                enabled = enabled,
+                                onClick = {
+                                    val next =
+                                        if (settings.updatesAutomationInterval == UpdatesAutomationInterval.DAILY) UpdatesAutomationInterval.WEEKLY
+                                        else UpdatesAutomationInterval.DAILY
+                                    viewModel.setUpdatesAutomationInterval(next)
+                                },
+                                modifier = Modifier.padding(end = 12.dp),
+                            ) {
+                                Text(if (settings.updatesAutomationInterval == UpdatesAutomationInterval.WEEKLY) "Weekly" else "Daily")
+                            }
+                        }
+                    },
+                    {
+                        val enabled = settings.updatesAutomationEnabled
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                ModernInfoItem(
+                                    icon = { Icon(Icons.Rounded.Notifications, null, modifier = Modifier.size(22.dp)) },
+                                    title = "Notify updates",
+                                    subtitle = "Show notification when new version is found",
+                                    iconBackgroundColor = iconBgColor,
+                                    iconContentColor = iconStyleColor,
+                                    iconShape = settings.iconShape,
+                                )
+                            }
+                            Switch(
+                                checked = settings.updatesAutomationNotify,
+                                onCheckedChange = { viewModel.setUpdatesAutomationNotify(it) },
+                                enabled = enabled,
+                                modifier = Modifier.padding(end = 20.dp),
+                            )
+                        }
+                    },
+                    {
+                        val enabled = settings.updatesAutomationEnabled
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                ModernInfoItem(
+                                    icon = { Icon(Icons.Rounded.Download, null, modifier = Modifier.size(22.dp)) },
+                                    title = "Auto download Otter APK",
+                                    subtitle = "Downloads in background (install still needs tap)",
+                                    iconBackgroundColor = iconBgColor,
+                                    iconContentColor = iconStyleColor,
+                                    iconShape = settings.iconShape,
+                                )
+                            }
+                            Switch(
+                                checked = settings.updatesAutomationAutoDownloadApk,
+                                onCheckedChange = { viewModel.setUpdatesAutomationAutoDownloadApk(it) },
+                                enabled = enabled,
+                                modifier = Modifier.padding(end = 20.dp),
+                            )
+                        }
+                    },
+                    {
+                        val enabled = settings.updatesAutomationEnabled
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                ModernInfoItem(
+                                    icon = { Icon(Icons.Rounded.NewReleases, null, modifier = Modifier.size(22.dp)) },
+                                    title = "Auto update yt-dlp",
+                                    subtitle = "Keeps yt-dlp updated automatically",
+                                    iconBackgroundColor = iconBgColor,
+                                    iconContentColor = iconStyleColor,
+                                    iconShape = settings.iconShape,
+                                )
+                            }
+                            Switch(
+                                checked = settings.updatesAutomationAutoUpdateYtDlp,
+                                onCheckedChange = { viewModel.setUpdatesAutomationAutoUpdateYtDlp(it) },
+                                enabled = enabled,
+                                modifier = Modifier.padding(end = 20.dp),
+                            )
+                        }
+                    },
+                    {
+                        val enabled = settings.updatesAutomationEnabled
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                ModernInfoItem(
+                                    icon = { Icon(Icons.Rounded.Extension, null, modifier = Modifier.size(22.dp)) },
+                                    title = "Auto check NewPipe",
+                                    subtitle = "Checks extractor updates automatically",
+                                    iconBackgroundColor = iconBgColor,
+                                    iconContentColor = iconStyleColor,
+                                    iconShape = settings.iconShape,
+                                )
+                            }
+                            Switch(
+                                checked = settings.updatesAutomationAutoCheckNewPipe,
+                                onCheckedChange = { viewModel.setUpdatesAutomationAutoCheckNewPipe(it) },
+                                enabled = enabled,
+                                modifier = Modifier.padding(end = 20.dp),
+                            )
+                        }
+                    },
+                    {
+                        val enabled = settings.updatesAutomationEnabled
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                ModernInfoItem(
+                                    icon = { Icon(Icons.Rounded.DeleteSweep, null, modifier = Modifier.size(22.dp)) },
+                                    title = "Auto clear cache",
+                                    subtitle = "Clears app cache automatically",
+                                    iconBackgroundColor = iconBgColor,
+                                    iconContentColor = iconStyleColor,
+                                    iconShape = settings.iconShape,
+                                )
+                            }
+                            Switch(
+                                checked = settings.updatesAutomationAutoClearCache,
+                                onCheckedChange = { viewModel.setUpdatesAutomationAutoClearCache(it) },
+                                enabled = enabled,
+                                modifier = Modifier.padding(end = 20.dp),
+                            )
+                        }
+                    },
+                ),
+        )
+
+        Spacer(modifier = Modifier.height(80.dp))
     }
 
     if (showYtdlpDialog) {

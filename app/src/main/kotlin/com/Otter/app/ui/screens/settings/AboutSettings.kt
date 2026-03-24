@@ -153,6 +153,18 @@ fun AboutSettings(
                 },
                 {
                     ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.History, null, modifier = Modifier.size(22.dp)) },
+                        title = "Commits",
+                        subtitle = "Latest changes",
+                        onClick = { navController.navigate("commits") },
+                        showArrow = true,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
+                    )
+                },
+                {
+                    ModernInfoItem(
                         icon = { Icon(Icons.Rounded.Code, null, modifier = Modifier.size(22.dp)) },
                         title = "GitHub",
                         subtitle = "Source code and releases",

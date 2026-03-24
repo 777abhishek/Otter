@@ -1,0 +1,43 @@
+name: Android GitHub Build
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-github-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: gradle
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x ./gradlew
+
+      - name: Build githubRelease
+        run: ./gradlew :app:assembleGithubRelease --no-daemon
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Otter-githubRelease-apks
+          path: |
+            app/build/outputs/apk/github/release/*.apk
+            app/build/outputs/apk/githubRelease/*.apk
+            app/build/outputs/mapping/githubRelease/mapping.txt
+          if-no-files-found: warn

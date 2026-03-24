@@ -30,8 +30,8 @@ android {
         applicationId = "com.Otter.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
-        versionName = "2.0.1"
+        versionCode = 4
+        versionName = "2.0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
@@ -45,6 +45,29 @@ android {
             (project.findProperty("Otter_APP_API_KEY") as? String)
                 ?: System.getenv("Otter_APP_API_KEY")
         buildConfigField("String", "Otter_APP_API_KEY", "\"${otterApiKey ?: ""}\"")
+
+        buildConfigField("Boolean", "FDROID_BUILD", "false")
+        buildConfigField("Boolean", "PLAY_BUILD", "false")
+        buildConfigField("Boolean", "GITHUB_BUILD", "false")
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("fdroid") {
+            dimension = "distribution"
+            applicationIdSuffix = ".fdroid"
+            versionNameSuffix = "-fdroid"
+            buildConfigField("Boolean", "FDROID_BUILD", "true")
+        }
+        create("github") {
+            dimension = "distribution"
+            versionNameSuffix = "-github"
+            buildConfigField("Boolean", "GITHUB_BUILD", "true")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("Boolean", "PLAY_BUILD", "true")
+        }
     }
 
     signingConfigs {
@@ -62,8 +85,8 @@ android {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a", "armeabi-v7a")
-            isUniversalApk = false
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
         }
     }
 
@@ -120,7 +143,8 @@ android {
         outputs.all {
             val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val abi = output?.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
-            output?.outputFileName = "Otter-arm-$abi-${buildType.name}.apk"
+            val flavor = flavorName.takeIf { it.isNotBlank() } ?: "noflavor"
+            output?.outputFileName = "Otter-$flavor-$abi-${buildType.name}.apk"
         }
     }
 }

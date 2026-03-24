@@ -1,57 +1,164 @@
-# GitHub Release Notes (v2.0.1)
+# Otter v2.0.2 - Streaming & UI Improvements
 
-## Highlights
-This patch release resolves **critical player screen bugs** affecting video playback, orientation controls, and UI conflicts.
+## Download
+[Download APK](../../releases/download/v2.0.2/app-release.apk)
+
+## Overview
+This release fixes critical streaming playback issues, improves the update checker, and enhances the UI with better formatting and card layouts.
+
+## Key Fixes
+
+### Streaming Playback
+- Fixed streaming auto-start: playback now automatically starts after buffering completes
+- Fixed playlist first video skipping: first video in queue now plays correctly instead of immediately advancing to next
+
+### Update Checker
+- Fixed GitHub API release fetching with proper headers
+- Added scrolling support for release notes
+- Added markdown formatting for release notes (strips ##, **, links, etc.)
+- Added error logging for debugging fetch failures
+
+### UI Improvements
+- Commits screen now shows commit author and date in card layout
+- Video description now properly strips HTML tags (<br>, <p>, etc.)
+- Added clickable links in video descriptions
+
+## Technical Details
+
+### Files Modified
+- `app/src/main/kotlin/com/Otter/app/player/PlayerService.kt` - Streaming auto-start, playlist handling
+- `app/src/main/kotlin/com/Otter/app/player/PlayerConnectionManager.kt` - Removed duplicate STATE_ENDED handling
+- `app/src/main/kotlin/com/Otter/app/util/AppUpdateUtil.kt` - GitHub API headers, error logging
+- `app/src/main/kotlin/com/Otter/app/util/UpdateUtil.kt` - GitHub API headers, error logging
+- `app/src/main/kotlin/com/Otter/app/ui/screens/settings/UpdateCheckerScreen.kt` - Scrolling, markdown formatting
+- `app/src/main/kotlin/com/Otter/app/ui/screens/settings/CommitsScreen.kt` - Card layout, author/date display
+- `app/src/main/kotlin/com/Otter/app/ui/screens/player/PlayerQueueSheets.kt` - HTML tag stripping
 
 ---
 
-## 🐛 Bug Fixes
+# GitHub Release Notes (v2.0.2)
 
-### 🎥 Video Player Issues
-- **Fixed**: Black screen with audio-only playback - video surface now properly attaches during recomposition
-  - Resolved SurfaceView detachment that occurred when PlayerScreen recomposed rapidly
-  - Video now displays correctly while audio plays
-- **Fixed**: Status bar gap flash when entering player screen
-  - Moved system bar hiding logic before first frame rendering
-  - Eliminates visible theme color flash/gap on player entry
-- **Fixed**: Edge-to-edge layout corruption after leaving player screen
-  - Removed incorrect `setDecorFitsSystemWindows(window, true)` onDispose
-  - Preserves app-wide edge-to-edge layout consistency
+## Release Overview
+**Version**: 2.0.2  
+**Date**: March 24, 2026  
+**Type**: Bug Fixes & Improvements  
 
-### 📱 Orientation & Controls
-- **Fixed**: Orientation conflict loop preventing return to portrait mode
-  - Changed `SCREEN_ORIENTATION_SENSOR_LANDSCAPE` to `SCREEN_ORIENTATION_SENSOR`
-  - Allows sensor to detect both landscape and portrait orientations
-  - Eliminates feedback loop between orientation lock and sensor
-- **Fixed**: Dual volume HUD (system + custom) appearing simultaneously
-  - Removed `AudioManager.FLAG_SHOW_UI` flag when adjusting volume
-  - Only custom volume gesture HUD now appears
+This release addresses critical streaming playback issues and improves the update checker functionality.
 
-### ✨ Player Improvements
-- Enhanced caption auto-selection when enabling captions
-  - Automatically selects first available caption track when captions are enabled
-- Improved queue navigation with proper back stack handling
-  - Better navigation between queue items using proper NavController patterns
+---
+
+## Bug Fixes
+
+### Streaming Playback Issues
+- **Fixed**: Streaming playback not auto-starting after buffering
+  - Added explicit `exoPlayer.play()` call when STATE_READY is reached
+  - Ensures playback starts automatically after buffering completes
+  - **Impact**: Critical - Fixes the main streaming issue
+
+- **Fixed**: First video in playlist skipping to next
+  - Removed duplicate STATE_ENDED handler in PlayerConnectionManager
+  - Added logging for position discontinuity events
+  - Disabled repeat mode to prevent auto-advancing
+  - **Impact**: High - Fixes playlist playback
+
+### Update Checker Issues
+- **Fixed**: GitHub API release fetching failures
+  - Added required headers: `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: 2022-11-28`
+  - Added error logging for debugging
+  - **Impact**: High - Update checker now works correctly
+
+---
+
+## Improvements
+
+### UI Enhancements
+- **Scrolling on Update Checker Screen**
+  - Added vertical scroll support for release notes
+  - Prevents content from being cut off
+
+- **Markdown Formatting for Release Notes**
+  - Strips headers (##, ###)
+  - Strips bold/italic markers (**, *, __, _)
+  - Strips links and images
+  - Strips inline code blocks
+  - Decodes HTML entities
+
+- **Commits Screen Card Layout**
+  - Each commit now displayed in a Card component
+  - Shows commit message, author name, and formatted date
+  - Better visual separation between commits
+
+- **Video Description Formatting**
+  - Strips HTML tags (<br>, <p>, <div>, etc.)
+  - Decodes HTML entities (&amp;, &lt;, &gt;, etc.)
+  - Clickable links in descriptions
 
 ---
 
 ## Technical Details
-- **VideoPlayerView**: Removed `remember()` pattern causing SurfaceView detachment
-- **PlayerScreen**: Moved `controller.hide()` before first frame render
-- **Orientation**: Used `SCREEN_ORIENTATION_SENSOR` instead of `SCREEN_ORIENTATION_SENSOR_LANDSCAPE`
-- **Volume**: Removed `AudioManager.FLAG_SHOW_UI` to prevent system volume HUD
+
+### Core Changes
+- **PlayerService**: Added explicit play() on STATE_READY, disabled repeat mode
+- **PlayerConnectionManager**: Removed duplicate STATE_ENDED handler
+- **AppUpdateUtil/UpdateUtil**: Added GitHub API headers and error logging
+- **UpdateCheckerScreen**: Added scroll support and markdown stripping
+- **CommitsScreen**: Added Card layout with author/date
+- **PlayerQueueSheets**: Added HTML tag stripping for video descriptions
+
+### Files Modified
+- `app/src/main/kotlin/com/Otter/app/player/PlayerService.kt`
+- `app/src/main/kotlin/com/Otter/app/player/PlayerConnectionManager.kt`
+- `app/src/main/kotlin/com/Otter/app/util/AppUpdateUtil.kt`
+- `app/src/main/kotlin/com/Otter/app/util/UpdateUtil.kt`
+- `app/src/main/kotlin/com/Otter/app/ui/screens/settings/UpdateCheckerScreen.kt`
+- `app/src/main/kotlin/com/Otter/app/ui/screens/settings/CommitsScreen.kt`
+- `app/src/main/kotlin/com/Otter/app/ui/screens/player/PlayerQueueSheets.kt`
+- `app/build.gradle.kts`
 
 ---
 
-## Files Changed
-- `app/src/main/kotlin/com/Otter/app/ui/screens/PlayerScreen.kt`
-- `app/src/main/kotlin/com/Otter/app/ui/screens/player/VideoPlayerView.kt`
+## Impact Summary
+- **Critical fixes**: 1 (streaming auto-start)
+- **High impact fixes**: 2 (playlist skipping, update checker)
+- **UI improvements**: 4
+- **Total issues resolved**: 7
+
+---
+
+## Release Status
+**Status**: Ready for release  
+**APK**: app-release.apk  
+**Min Android**: 7.0 (API 24)  
+**Target Android**: 16 (API 36)
+- ✅ **Code pushed to `main`**
+- ✅ **Tag pushed: `v2.0.1`**
+- ✅ **Version updated in build.gradle.kts**
+- ✅ **changelog.json created**
+- ✅ **Release notes finalized**
+
+---
+
+## 📋 Previous Releases
+
+### v2.0.0 (Major Release)
+**Highlights**: In-app updates + changelog, download reliability improvements, format selection UX enhancements
+
+**Key Features**:
+- Complete App Updates screen with GitHub integration
+- Changelog screen with categorized release notes  
+- Improved format selection with Video/Audio separation
+- Enhanced download engine compatibility
+- Settings integration improvements
+
+**Major Fixes**:
+- Foreground service startup crash resolution
+- Subscription sync retry behavior optimization
 
 ---
 
 ## Status
 - **Code pushed to `main`**
-- **Tag pushed: `v2.0.1`**
+- **Tag pushed: `v2.0.0`**
 
 ---
 

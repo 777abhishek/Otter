@@ -164,14 +164,38 @@ fun PlayerQueueBottomSheet(
 
 private val urlRegex = Regex("(https?://\\S+)")
 
+private fun stripHtmlTags(text: String): String {
+    return text
+        // Replace <br> and <br/> with newlines
+        .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+        // Replace </p> with newlines
+        .replace(Regex("</p>", RegexOption.IGNORE_CASE), "\n")
+        // Replace </div> with newlines
+        .replace(Regex("</div>", RegexOption.IGNORE_CASE), "\n")
+        // Remove all other HTML tags
+        .replace(Regex("<[^>]+>"), "")
+        // Decode common HTML entities
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+        // Clean up multiple newlines
+        .replace(Regex("\n{3,}"), "\n\n")
+        .trim()
+}
+
 private fun linkify(text: String): AnnotatedString {
+    // First strip HTML tags, then linkify URLs
+    val cleanText = stripHtmlTags(text)
     return buildAnnotatedString {
         var lastIndex = 0
-        for (match in urlRegex.findAll(text)) {
+        for (match in urlRegex.findAll(cleanText)) {
             val start = match.range.first
             val end = match.range.last + 1
             if (start > lastIndex) {
-                append(text.substring(lastIndex, start))
+                append(cleanText.substring(lastIndex, start))
             }
             val url = match.value.trimEnd('.', ',', ')', ']', '}', '"', '\'')
             val displayStart = length
@@ -190,8 +214,8 @@ private fun linkify(text: String): AnnotatedString {
             )
             lastIndex = end
         }
-        if (lastIndex < text.length) {
-            append(text.substring(lastIndex))
+        if (lastIndex < cleanText.length) {
+            append(cleanText.substring(lastIndex))
         }
     }
 }

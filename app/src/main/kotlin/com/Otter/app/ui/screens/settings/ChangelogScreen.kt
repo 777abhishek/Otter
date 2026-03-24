@@ -1,7 +1,5 @@
 package com.Otter.app.ui.screens.settings
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,11 +38,11 @@ import androidx.navigation.NavController
 import com.Otter.app.ui.components.Material3ExpressiveSettingsGroup
 import com.Otter.app.ui.components.ModernInfoItem
 import com.Otter.app.ui.viewmodels.SettingsViewModel
-import com.Otter.app.util.AppUpdateUtil
-import com.Otter.app.util.ReleaseNotesUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 @Composable
 private fun NotesSection(
@@ -74,6 +71,63 @@ private fun NotesSection(
     }
 }
 
+private data class ChangelogItem(
+    val title: String,
+    val description: String,
+)
+
+private data class ChangelogRelease(
+    val version: String,
+    val versionCode: Int,
+    val date: String,
+    val type: String,
+    val highlights: List<String>,
+    val fixes: List<ChangelogItem>,
+    val improvements: List<ChangelogItem>,
+)
+
+private fun parseChangelogJson(json: String): List<ChangelogRelease> {
+    val root = JSONObject(json)
+    val releases = root.optJSONArray("releases") ?: JSONArray()
+    return (0 until releases.length()).mapNotNull { idx ->
+        val r = releases.optJSONObject(idx) ?: return@mapNotNull null
+        val categories = r.optJSONObject("categories")
+        val fixes = categories?.optJSONArray("fixes")
+        val improvements = categories?.optJSONArray("improvements")
+
+        fun parseItems(arr: JSONArray?): List<ChangelogItem> {
+            if (arr == null) return emptyList()
+            return (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                val title = o.optString("title").trim()
+                val desc = o.optString("description").trim()
+                if (title.isBlank() && desc.isBlank()) return@mapNotNull null
+                ChangelogItem(title = title, description = desc)
+            }
+        }
+
+        val highlightsJson = r.optJSONArray("highlights")
+        val highlightsList =
+            if (highlightsJson == null) {
+                emptyList()
+            } else {
+                (0 until highlightsJson.length()).mapNotNull { i ->
+                    highlightsJson.optString(i).takeIf { it.isNotBlank() }
+                }
+            }
+
+        ChangelogRelease(
+            version = r.optString("version").ifBlank { r.optString("tag") },
+            versionCode = r.optInt("versionCode"),
+            date = r.optString("date"),
+            type = r.optString("type"),
+            highlights = highlightsList,
+            fixes = parseItems(fixes),
+            improvements = parseItems(improvements),
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangelogScreen(
@@ -93,9 +147,9 @@ fun ChangelogScreen(
     }
 
     var isLoading by remember { mutableStateOf(false) }
-    var releases by remember { mutableStateOf<List<AppUpdateUtil.Release>>(emptyList()) }
+    var releases by remember { mutableStateOf<List<ChangelogRelease>>(emptyList()) }
     var errorText by remember { mutableStateOf<String?>(null) }
-    var selectedRelease by remember { mutableStateOf<AppUpdateUtil.Release?>(null) }
+    var selectedRelease by remember { mutableStateOf<ChangelogRelease?>(null) }
 
     fun load() {
         if (isLoading) return
@@ -103,11 +157,15 @@ fun ChangelogScreen(
             isLoading = true
             errorText = null
             runCatching {
-                val list = withContext(Dispatchers.IO) { AppUpdateUtil.fetchReleases(limit = 15) }
+                val list =
+                    withContext(Dispatchers.IO) {
+                        val json = context.assets.open("changelog.json").bufferedReader().use { it.readText() }
+                        parseChangelogJson(json)
+                    }
                 releases = list
                 selectedRelease =
                     if (!initialTag.isNullOrBlank()) {
-                        list.firstOrNull { it.tagName == initialTag } ?: list.firstOrNull()
+                        list.firstOrNull { it.version == initialTag } ?: list.firstOrNull()
                     } else {
                         list.firstOrNull()
                     }
@@ -155,7 +213,6 @@ fun ChangelogScreen(
 
         val selected = selectedRelease
         if (selected != null) {
-            val parsed = remember(selected.body) { ReleaseNotesUtil.parse(selected.body) }
             Material3ExpressiveSettingsGroup(
                 modifier = Modifier.fillMaxWidth(),
                 items =
@@ -163,47 +220,46 @@ fun ChangelogScreen(
                         {
                             ModernInfoItem(
                                 icon = { Icon(Icons.Rounded.Description, null, modifier = Modifier.padding(2.dp)) },
-                                title = selected.name.ifBlank { selected.tagName },
-                                subtitle = selected.publishedAt.ifBlank { selected.tagName },
+                                title = "v${selected.version}",
+                                subtitle = buildString {
+                                    if (selected.date.isNotBlank()) append(selected.date)
+                                    if (selected.type.isNotBlank()) {
+                                        if (isNotEmpty()) append(" · ")
+                                        append(selected.type)
+                                    }
+                                    if (selected.versionCode > 0) {
+                                        if (isNotEmpty()) append(" · ")
+                                        append("code ")
+                                        append(selected.versionCode)
+                                    }
+                                },
                                 onClick = {},
                                 showArrow = false,
                                 iconBackgroundColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
                                 iconContentColor = MaterialTheme.colorScheme.primary,
                                 iconShape = settings.iconShape,
-                                trailingContent = {
-                                    IconButton(
-                                        onClick = {
-                                            val url = "https://github.com/777abhishek/Otter/releases/tag/${selected.tagName}"
-                                            context.startActivity(
-                                                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                            )
-                                        },
-                                    ) {
-                                        Icon(Icons.Rounded.OpenInNew, contentDescription = "Open")
-                                    }
-                                },
                             )
                         },
                     ),
             )
 
-            if (
-                parsed.fixes.isEmpty() &&
-                    parsed.improvements.isEmpty() &&
-                    parsed.patches.isEmpty() &&
-                    parsed.other.isEmpty()
-            ) {
-                Text(
-                    text = "No release notes",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            } else {
-                NotesSection(title = "Fixes", lines = parsed.fixes)
-                NotesSection(title = "Improvements", lines = parsed.improvements)
-                NotesSection(title = "Patches", lines = parsed.patches)
-                NotesSection(title = "Other", lines = parsed.other)
-            }
+            NotesSection(title = "Highlights", lines = selected.highlights)
+            NotesSection(
+                title = "Fixes",
+                lines = selected.fixes.map { item ->
+                    if (item.title.isBlank()) item.description
+                    else if (item.description.isBlank()) item.title
+                    else "${item.title}: ${item.description}"
+                },
+            )
+            NotesSection(
+                title = "Improvements",
+                lines = selected.improvements.map { item ->
+                    if (item.title.isBlank()) item.description
+                    else if (item.description.isBlank()) item.title
+                    else "${item.title}: ${item.description}"
+                },
+            )
         }
 
         if (releases.isNotEmpty()) {
@@ -222,8 +278,8 @@ fun ChangelogScreen(
                         {
                             ModernInfoItem(
                                 icon = { Icon(Icons.Rounded.Description, null, modifier = Modifier.padding(2.dp)) },
-                                title = r.tagName,
-                                subtitle = r.name.ifBlank { "Release" },
+                                title = "v${r.version}",
+                                subtitle = r.date.ifBlank { "Release" },
                                 onClick = {
                                     selectedRelease = r
                                 },

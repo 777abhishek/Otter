@@ -1,14 +1,19 @@
 package com.Otter.app
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -75,6 +80,7 @@ import com.Otter.app.ui.screens.settings.AboutSettings
 import com.Otter.app.ui.screens.settings.AppearanceSettingsScreen
 import com.Otter.app.ui.screens.settings.BackupAndRestore
 import com.Otter.app.ui.screens.settings.ChangelogScreen
+import com.Otter.app.ui.screens.settings.CommitsScreen
 import com.Otter.app.ui.screens.settings.ContentSettings
 import com.Otter.app.ui.screens.settings.ContributorsScreen
 import com.Otter.app.ui.screens.settings.CookieTargetsScreen
@@ -87,6 +93,8 @@ import com.Otter.app.ui.screens.settings.ProfilesSettings
 import com.Otter.app.ui.screens.settings.SettingsScreen
 import com.Otter.app.ui.screens.settings.StorageSettings
 import com.Otter.app.ui.screens.settings.UpdatesSettings
+import com.Otter.app.ui.screens.settings.UpdateCheckerScreen
+import com.Otter.app.ui.screens.settings.UpdateType
 import com.Otter.app.ui.session.AppSessionStore
 import com.Otter.app.ui.theme.OtterTheme
 import com.Otter.app.ui.viewmodels.SettingsViewModel
@@ -122,10 +130,77 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Permission launcher for multiple permissions
+    private val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val denied = permissions.filter { !it.value }.keys
+            if (denied.isNotEmpty()) {
+                Toast.makeText(
+                    this,
+                    "Some permissions were denied. App features may be limited.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+
+    private fun checkAndRequestPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+
+        // Notification permission (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // Storage/Media permissions
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // Android 14+: Use granular media permissions
+            val mediaPerms = listOf(
+                Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.READ_MEDIA_IMAGES,
+            )
+            mediaPerms.forEach { perm ->
+                if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                    permissionsToRequest.add(perm)
+                }
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13: READ_MEDIA_AUDIO/VIDEO/IMAGES
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionsToRequest.add(Manifest.permission.READ_MEDIA_AUDIO)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionsToRequest.add(Manifest.permission.READ_MEDIA_VIDEO)
+            }
+        } else {
+            // Android 12 and below: READ_EXTERNAL_STORAGE
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            permissionLauncher.launch(permissionsToRequest.toTypedArray())
+        }
+    }
+
     @UnstableApi
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        
+        // Check and request essential permissions on app start
+        checkAndRequestPermissions()
         
         splashScreen.setOnExitAnimationListener { splashScreenViewProvider ->
             val fadeOut = ObjectAnimator.ofFloat(
@@ -510,6 +585,13 @@ fun Otter(onRestartApp: () -> Unit = {}) {
                             )
                         }
 
+                        composable("commits") {
+                            CommitsScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+
                         composable("diagnosticsSettings") {
                             DiagnosticsSettings(
                                 navController = navController,
@@ -543,6 +625,30 @@ fun Otter(onRestartApp: () -> Unit = {}) {
                             UpdatesSettings(
                                 navController = navController,
                                 onBack = { navController.popBackStack() },
+                            )
+                        }
+
+                        composable("update_checker") {
+                            UpdateCheckerScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                                updateType = UpdateType.OTTER,
+                            )
+                        }
+
+                        composable("update_checker_ytdlp") {
+                            UpdateCheckerScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                                updateType = UpdateType.YT_DLP,
+                            )
+                        }
+
+                        composable("update_checker_newpipe") {
+                            UpdateCheckerScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                                updateType = UpdateType.NEWPIPE,
                             )
                         }
 

@@ -177,6 +177,7 @@ class PlayerService : MediaSessionService() {
     lateinit var playbackResumeStore: PlaybackResumeStore
 
     private lateinit var exoPlayer: ExoPlayer
+    private lateinit var queueAwarePlayer: Player
     private lateinit var mediaSession: MediaSession
     @UnstableApi
     private lateinit var trackSelector: DefaultTrackSelector
@@ -261,6 +262,7 @@ class PlayerService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         initializePlayer()
+        queueAwarePlayer = createQueueAwarePlayer()
         initializeMediaSession()
         createNotificationChannel()
         initializeNotificationManager()
@@ -405,29 +407,6 @@ class PlayerService : MediaSessionService() {
             )
 
         val imageLoader = ImageLoader(this)
-
-        val queueAwarePlayer: Player =
-            object : ForwardingPlayer(exoPlayer) {
-                override fun hasNextMediaItem(): Boolean {
-                    val queue = _queue.value
-                    if (queue.isEmpty()) return false
-                    return _currentQueueIndex.value < queue.size - 1
-                }
-
-                override fun hasPreviousMediaItem(): Boolean {
-                    val queue = _queue.value
-                    if (queue.isEmpty()) return false
-                    return _currentQueueIndex.value > 0
-                }
-
-                override fun seekToNextMediaItem() {
-                    playNext()
-                }
-
-                override fun seekToPreviousMediaItem() {
-                    playPrevious()
-                }
-            }
 
         playerNotificationManager =
             PlayerNotificationManager.Builder(this, NOTIFICATION_ID, CHANNEL_ID)
@@ -599,6 +578,9 @@ class PlayerService : MediaSessionService() {
                 .setWakeMode(C.WAKE_MODE_NETWORK) // Keep CPU running during network streaming
                 .build()
                 .apply {
+                    // Disable repeat mode to prevent auto-advancing
+                    repeatMode = Player.REPEAT_MODE_OFF
+                    
                     addListener(
                         object : Player.Listener {
                             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -633,9 +615,12 @@ class PlayerService : MediaSessionService() {
                                             return
                                         }
                                         
-                                        // ExoPlayer automatically plays when playWhenReady=true and STATE_READY
-                                        // No need to manually call play() - it's already handled by the player
-                                        // Just update the UI state
+                                        // CRITICAL: Explicitly start playback if playWhenReady=true but not playing
+                                        // This fixes the issue where buffering completes but playback doesn't auto-start
+                                        if (exoPlayer.playWhenReady && !exoPlayer.isPlaying && !userPaused) {
+                                            runCatching { exoPlayer.play() }
+                                        }
+                                        
                                         updatePlaybackStateFromPlayer()
                                     }
                                     Player.STATE_ENDED -> {
@@ -671,11 +656,17 @@ class PlayerService : MediaSessionService() {
                                 newPosition: Player.PositionInfo,
                                 reason: Int,
                             ) {
+                                Log.d(logTag, "onPositionDiscontinuity reason=$reason oldPos=${oldPosition.positionMs} newPos=${newPosition.positionMs}")
+                                
                                 // Track seek completion
                                 if (reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) {
                                     isSeeking = false
                                     pendingSeekPosition = -1L
                                 }
+                                
+                                // Don't auto-advance on AUTO_TRANSITION - let STATE_ENDED handle queue progression
+                                // This prevents premature skipping when the first video starts
+                                
                                 updatePlaybackStateFromPlayer()
                             }
 
@@ -684,6 +675,16 @@ class PlayerService : MediaSessionService() {
                                 // This commonly happens after seek/forward on some streams.
                                 val raw = error.message ?: "Playback error"
                                 val wasPlaying = exoPlayer.playWhenReady
+                                
+                                Log.e(logTag, "Player error: $raw, wasPlaying=$wasPlaying, userPaused=$userPaused")
+
+                                // Don't try to recover if user explicitly paused or if this is initial load
+                                if (userPaused) {
+                                    _playbackState.value = PlaybackState.Error(toUserFacingStreamingError(raw))
+                                    updateNotification()
+                                    updateMediaSession()
+                                    return
+                                }
 
                                 val recovered =
                                     runCatching {
@@ -710,9 +711,34 @@ class PlayerService : MediaSessionService() {
         startPlaybackPositionTracking()
     }
 
+    @OptIn(UnstableApi::class)
+    private fun createQueueAwarePlayer(): Player {
+        return object : ForwardingPlayer(exoPlayer) {
+            override fun hasNextMediaItem(): Boolean {
+                val queue = _queue.value
+                if (queue.isEmpty()) return false
+                return _currentQueueIndex.value < queue.size - 1
+            }
+
+            override fun hasPreviousMediaItem(): Boolean {
+                val queue = _queue.value
+                if (queue.isEmpty()) return false
+                return _currentQueueIndex.value > 0
+            }
+
+            override fun seekToNextMediaItem() {
+                playNext()
+            }
+
+            override fun seekToPreviousMediaItem() {
+                playPrevious()
+            }
+        }
+    }
+
     private fun initializeMediaSession() {
         mediaSession =
-            MediaSession.Builder(this, exoPlayer)
+            MediaSession.Builder(this, queueAwarePlayer)
                 .setId("OtterPlayerService")
                 .setCallback(
                     object : MediaSession.Callback {

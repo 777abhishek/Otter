@@ -19,12 +19,26 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
+/**
+ * Common data class for release information across all update types
+ */
+data class ReleaseInfo(
+    val tagName: String,
+    val name: String = tagName,
+    val body: String = "",
+    val publishedAt: String = "",
+    val downloadUrl: String? = null,
+    val sizeBytes: Long = 0,
+)
+
 object UpdateUtil {
     private const val TAG = "UpdateUtil"
 
     private const val UPDATES_CHANNEL_ID = "updates_channel"
     private const val UPDATES_CHANNEL_NAME = "Updates"
     private const val NOTIFICATION_ID_UPDATES = 1301
+
+    private val client = OkHttpClient()
 
     private fun canPostNotifications(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -146,13 +160,68 @@ object UpdateUtil {
         return YoutubeDL.getInstance().version(context)
     }
 
+    /**
+     * Fetch yt-dlp release info from GitHub
+     */
+    suspend fun fetchYtDlpRelease(): ReleaseInfo? = withContext(Dispatchers.IO) {
+        fetchGitHubRelease("yt-dlp/yt-dlp")
+    }
+
+    /**
+     * Fetch NewPipe Extractor release info from GitHub
+     */
+    suspend fun fetchNewPipeRelease(): ReleaseInfo? = withContext(Dispatchers.IO) {
+        fetchGitHubRelease("TeamNewPipe/NewPipeExtractor")
+    }
+
+    /**
+     * Generic GitHub release fetcher
+     */
+    suspend fun fetchGitHubRelease(repo: String): ReleaseInfo? = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("https://api.github.com/repos/$repo/releases/latest")
+                .header("Accept", "application/vnd.github+json")
+                .header("X-GitHub-Api-Version", "2022-11-28")
+                .build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                android.util.Log.e("UpdateUtil", "GitHub API error for $repo: ${response.code} ${response.message}")
+                return@withContext null
+            }
+            val body = response.body?.string()
+            if (body.isNullOrBlank()) {
+                android.util.Log.e("UpdateUtil", "GitHub API empty response for $repo")
+                return@withContext null
+            }
+            val json = JSONObject(body)
+            val assets = json.optJSONArray("assets")
+            val firstAsset = if (assets != null && assets.length() > 0) {
+                assets.getJSONObject(0)
+            } else null
+            
+            ReleaseInfo(
+                tagName = json.optString("tag_name"),
+                name = json.optString("name", json.optString("tag_name")),
+                body = json.optString("body"),
+                publishedAt = json.optString("published_at"),
+                downloadUrl = firstAsset?.optString("browser_download_url"),
+                sizeBytes = firstAsset?.optLong("size") ?: 0,
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("UpdateUtil", "Failed to fetch release from $repo: ${e.message}", e)
+            null
+        }
+    }
+
     suspend fun checkNewPipeUpdates(): String? =
         withContext(Dispatchers.IO) {
             try {
-                val client = OkHttpClient()
                 val request =
                     Request.Builder()
                         .url("https://api.github.com/repos/TeamNewPipe/NewPipeExtractor/releases/latest")
+                        .header("Accept", "application/vnd.github+json")
+                        .header("X-GitHub-Api-Version", "2022-11-28")
                         .build()
 
                 val response = client.newCall(request).execute()

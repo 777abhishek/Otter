@@ -454,7 +454,11 @@ val act = LocalContext.current as? Activity
                                             },
                                         )
                                     },
-                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                            resizeMode = if (isFullscreen) {
+                                AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            } else {
+                                AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                            },
                             onTap = { },
                         )
                     }
