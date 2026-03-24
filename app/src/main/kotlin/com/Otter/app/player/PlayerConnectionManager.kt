@@ -183,10 +183,30 @@ class PlayerConnectionManager
                         _isBuffering.value = playbackState == androidx.media3.common.Player.STATE_BUFFERING
                         _playbackState.value = playbackState
                         updatePosition()
-                        
-                        // Reset reconnection counter on successful playback
-                        if (playbackState == androidx.media3.common.Player.STATE_READY) {
-                            reconnectionAttempts = 0
+
+                        when (playbackState) {
+                            androidx.media3.common.Player.STATE_READY -> {
+                                // Reset reconnection counter on successful readiness
+                                reconnectionAttempts = 0
+
+                                // Extra safety: if the service thinks we should be playing but the
+                                // controller is paused (can happen after long buffering), nudge play.
+                                val controller = mediaController
+                                if (controller != null && controller.playWhenReady && !controller.isPlaying) {
+                                    controller.play()
+                                }
+                            }
+
+                            androidx.media3.common.Player.STATE_ENDED -> {
+                                // As a fallback, if the queue suggests we have a next item but playback
+                                // stopped, request the service to advance. The service also handles this,
+                                // but this keeps UI-driven sessions from stalling.
+                                val queueSize = _queue.value.size
+                                val index = _queueIndex.value
+                                if (queueSize > 0 && index < queueSize - 1) {
+                                    playNext()
+                                }
+                            }
                         }
                     }
 

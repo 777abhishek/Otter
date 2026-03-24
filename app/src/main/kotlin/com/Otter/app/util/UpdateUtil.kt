@@ -90,6 +90,14 @@ object UpdateUtil {
         }
     }
 
+    fun postUpdateAvailableNotification(
+        title: String,
+        text: String,
+    ) {
+        val context = OtterApplication.appContext
+        postUpdateNotification(context, title = title, text = text, ongoing = false)
+    }
+
     suspend fun updateYtDlpWithNotification(): YoutubeDL.UpdateStatus? {
         val context = OtterApplication.appContext
         postUpdateNotification(context, "Updating yt-dlp", "Checking for updates…", ongoing = true)

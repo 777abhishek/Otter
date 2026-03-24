@@ -10,4 +10,9 @@
         <!-- After splash screen, hand off to standard App theme -->
         <item name="postSplashScreenTheme">@style/Theme.AppCompat.DayNight</item>
     </style>
+
+    <style name="Theme.AppCompat.DayNight" parent="Theme.MaterialComponents.DayNight">
+        <!-- Ensure window background is transparent -->
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
 </resources>

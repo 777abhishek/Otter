@@ -26,6 +26,7 @@ import com.Otter.app.data.models.StorageStats
 import com.Otter.app.data.models.StreamFormatPreference
 import com.Otter.app.data.models.StreamingQuality
 import com.Otter.app.data.models.ThemeMode
+import com.Otter.app.data.models.UpdatesAutomationInterval
 import com.Otter.app.data.models.UserProfile
 import com.Otter.app.data.models.VideoQuality
 import com.Otter.app.service.SettingsService
@@ -106,6 +107,15 @@ class SettingsServiceImpl
             val SPONSOR_BLOCK_ENABLED = booleanPreferencesKey("sponsor_block_enabled")
             val SPONSOR_BLOCK_CATEGORIES = stringPreferencesKey("sponsor_block_categories")
             val SHOW_MINI_PLAYER_IN_AUDIO_MODE = booleanPreferencesKey("show_mini_player_in_audio_mode")
+
+            // Updates automation
+            val UPDATES_AUTOMATION_ENABLED = booleanPreferencesKey("updates_automation_enabled")
+            val UPDATES_AUTOMATION_INTERVAL = stringPreferencesKey("updates_automation_interval")
+            val UPDATES_AUTOMATION_NOTIFY = booleanPreferencesKey("updates_automation_notify")
+            val UPDATES_AUTOMATION_AUTO_DOWNLOAD_APK = booleanPreferencesKey("updates_automation_auto_download_apk")
+            val UPDATES_AUTOMATION_AUTO_UPDATE_YTDLP = booleanPreferencesKey("updates_automation_auto_update_ytdlp")
+            val UPDATES_AUTOMATION_AUTO_CHECK_NEWPIPE = booleanPreferencesKey("updates_automation_auto_check_newpipe")
+            val UPDATES_AUTOMATION_AUTO_CLEAR_CACHE = booleanPreferencesKey("updates_automation_auto_clear_cache")
         }
 
         override fun getSettings(): Flow<AppSettings> {
@@ -205,6 +215,20 @@ class SettingsServiceImpl
                             SponsorBlockCategory.OUTRO,
                         ),
                     showMiniPlayerInAudioMode = preferences[PreferencesKeys.SHOW_MINI_PLAYER_IN_AUDIO_MODE] ?: true,
+
+                    // Updates automation
+                    updatesAutomationEnabled = preferences[PreferencesKeys.UPDATES_AUTOMATION_ENABLED] ?: false,
+                    updatesAutomationInterval =
+                        runCatching {
+                            UpdatesAutomationInterval.valueOf(
+                                preferences[PreferencesKeys.UPDATES_AUTOMATION_INTERVAL] ?: UpdatesAutomationInterval.DAILY.name,
+                            )
+                        }.getOrElse { UpdatesAutomationInterval.DAILY },
+                    updatesAutomationNotify = preferences[PreferencesKeys.UPDATES_AUTOMATION_NOTIFY] ?: true,
+                    updatesAutomationAutoDownloadApk = preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_DOWNLOAD_APK] ?: false,
+                    updatesAutomationAutoUpdateYtDlp = preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_UPDATE_YTDLP] ?: true,
+                    updatesAutomationAutoCheckNewPipe = preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_CHECK_NEWPIPE] ?: true,
+                    updatesAutomationAutoClearCache = preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_CLEAR_CACHE] ?: false,
                 )
             }
         }
@@ -272,6 +296,92 @@ class SettingsServiceImpl
                     preferences[PreferencesKeys.SPONSOR_BLOCK_ENABLED] = settings.sponsorBlockEnabled
                     preferences[PreferencesKeys.SPONSOR_BLOCK_CATEGORIES] = settings.sponsorBlockCategories.joinToString(",")
                     preferences[PreferencesKeys.SHOW_MINI_PLAYER_IN_AUDIO_MODE] = settings.showMiniPlayerInAudioMode
+
+                    // Updates automation
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_ENABLED] = settings.updatesAutomationEnabled
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_INTERVAL] = settings.updatesAutomationInterval.name
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_NOTIFY] = settings.updatesAutomationNotify
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_DOWNLOAD_APK] = settings.updatesAutomationAutoDownloadApk
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_UPDATE_YTDLP] = settings.updatesAutomationAutoUpdateYtDlp
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_CHECK_NEWPIPE] = settings.updatesAutomationAutoCheckNewPipe
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_CLEAR_CACHE] = settings.updatesAutomationAutoClearCache
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        override suspend fun setUpdatesAutomationEnabled(enabled: Boolean): Result<Unit> {
+            return try {
+                context.dataStore.edit { preferences ->
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_ENABLED] = enabled
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        override suspend fun setUpdatesAutomationInterval(interval: UpdatesAutomationInterval): Result<Unit> {
+            return try {
+                context.dataStore.edit { preferences ->
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_INTERVAL] = interval.name
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        override suspend fun setUpdatesAutomationNotify(enabled: Boolean): Result<Unit> {
+            return try {
+                context.dataStore.edit { preferences ->
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_NOTIFY] = enabled
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        override suspend fun setUpdatesAutomationAutoDownloadApk(enabled: Boolean): Result<Unit> {
+            return try {
+                context.dataStore.edit { preferences ->
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_DOWNLOAD_APK] = enabled
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        override suspend fun setUpdatesAutomationAutoUpdateYtDlp(enabled: Boolean): Result<Unit> {
+            return try {
+                context.dataStore.edit { preferences ->
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_UPDATE_YTDLP] = enabled
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        override suspend fun setUpdatesAutomationAutoCheckNewPipe(enabled: Boolean): Result<Unit> {
+            return try {
+                context.dataStore.edit { preferences ->
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_CHECK_NEWPIPE] = enabled
+                }
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+        override suspend fun setUpdatesAutomationAutoClearCache(enabled: Boolean): Result<Unit> {
+            return try {
+                context.dataStore.edit { preferences ->
+                    preferences[PreferencesKeys.UPDATES_AUTOMATION_AUTO_CLEAR_CACHE] = enabled
                 }
                 Result.success(Unit)
             } catch (e: Exception) {

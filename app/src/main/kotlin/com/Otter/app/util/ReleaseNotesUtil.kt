@@ -15,6 +15,28 @@ object ReleaseNotesUtil {
         val other: List<String>,
     )
 
+    /**
+     * Clean markdown formatting from text
+     */
+    private fun cleanMarkdown(text: String): String {
+        return text
+            // Remove bold/italic markers
+            .replace("**", "")
+            .replace("__", "")
+            .replace("*", "")
+            .replace("_", "")
+            // Remove headers
+            .removePrefix("#").removePrefix("##").removePrefix("###")
+            // Remove strikethrough
+            .replace("~~", "")
+            // Remove code blocks
+            .replace("`", "")
+            // Remove links but keep text [text](url) -> text
+            .replace(Regex("\\[([^\\]]+)\\]\\([^)]+\\)"), "$1")
+            // Clean up whitespace
+            .trim()
+    }
+
     fun parse(body: String): ParsedNotes {
         val lines =
             body
@@ -31,7 +53,7 @@ object ReleaseNotesUtil {
 
         fun addLine(section: Section, text: String) {
             if (text.isBlank()) return
-            val cleaned = text.removePrefix("-").removePrefix("*").trim()
+            val cleaned = cleanMarkdown(text.removePrefix("-").removePrefix("*").trim())
             if (cleaned.isBlank()) return
             when (section) {
                 Section.FIXES -> fixes.add(cleaned)

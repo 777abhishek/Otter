@@ -19,4 +19,13 @@ class DownloadViewModel
         fun restart(task: Task) = downloader.restart(task)
 
         fun remove(task: Task): Boolean = downloader.remove(task)
+
+       
+        fun cancelAll(): Int = downloader.cancelAll()
+
+        fun removeCompleted(): Int = downloader.removeCompleted()
+
+        fun removeFailed(): Int = downloader.removeFailed()
+
+        fun clearAll(): Int = downloader.clearAll()
     }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +35,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.Otter.app.data.download.DownloadPreferences
@@ -43,6 +51,13 @@ import com.Otter.app.ui.download.configure.DownloadErrorSnackbar
 import com.Otter.app.ui.download.configure.PlaylistSelectionSheet
 
 private enum class DownloadFilter { All, Downloading, Canceled, Finished }
+
+private enum class SmartAction {
+    CancelAll,
+    RemoveCompleted,
+    RemoveFailed,
+    ClearAll,
+}
 
 private fun normalizeHttpUrl(input: String): String {
     val raw = input.trim().replace("\n", "").replace("\r", "")
@@ -135,6 +150,35 @@ fun DownloadScreen(
             )
         }
 
+    // Smart action menu
+    var showSmartMenu by remember { mutableStateOf(false) }
+    var showConfirmDialog by remember { mutableStateOf<SmartAction?>(null) }
+
+    // Count tasks by state for smart actions
+    val downloadingCount by remember(tasks) {
+        derivedStateOf {
+            tasks.count { (_, state) ->
+                state.downloadState is Task.DownloadState.FetchingInfo ||
+                state.downloadState is Task.DownloadState.Running ||
+                state.downloadState == Task.DownloadState.Idle ||
+                state.downloadState == Task.DownloadState.ReadyWithInfo
+            }
+        }
+    }
+    val completedCount by remember(tasks) {
+        derivedStateOf {
+            tasks.count { (_, state) -> state.downloadState is Task.DownloadState.Completed }
+        }
+    }
+    val failedCount by remember(tasks) {
+        derivedStateOf {
+            tasks.count { (_, state) ->
+                state.downloadState is Task.DownloadState.Canceled ||
+                state.downloadState is Task.DownloadState.Error
+            }
+        }
+    }
+
     val filteredTasks by remember(tasks, selectedFilter) {
         derivedStateOf {
             tasks.toList().filter { (_, state) ->
@@ -190,13 +234,77 @@ fun DownloadScreen(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(
-                    text = "Downloads",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 4.dp),
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Downloads",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+
+                    // Smart actions menu button
+                    Spacer(modifier = Modifier.weight(1f))
+                    Box {
+                        IconButton(onClick = { showSmartMenu = true }) {
+                            Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
+                        }
+                        DropdownMenu(
+                            expanded = showSmartMenu,
+                            onDismissRequest = { showSmartMenu = false },
+                            properties = PopupProperties(focusable = true),
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Cancel all downloading") },
+                                onClick = {
+                                    showSmartMenu = false
+                                    showConfirmDialog = SmartAction.CancelAll
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Cancel, contentDescription = null)
+                                },
+                                enabled = downloadingCount > 0,
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Remove completed (${completedCount})") },
+                                onClick = {
+                                    showSmartMenu = false
+                                    showConfirmDialog = SmartAction.RemoveCompleted
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.CheckCircle, contentDescription = null)
+                                },
+                                enabled = completedCount > 0,
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Remove failed/canceled (${failedCount})") },
+                                onClick = {
+                                    showSmartMenu = false
+                                    showConfirmDialog = SmartAction.RemoveFailed
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.ErrorOutline, contentDescription = null)
+                                },
+                                enabled = failedCount > 0,
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                            DropdownMenuItem(
+                                text = { Text("Clear all (${tasks.size})") },
+                                onClick = {
+                                    showSmartMenu = false
+                                    showConfirmDialog = SmartAction.ClearAll
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.DeleteForever, contentDescription = null)
+                                },
+                                enabled = tasks.isNotEmpty(),
+                            )
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = urlInput,
@@ -350,6 +458,53 @@ fun DownloadScreen(
                     onDismissRequest = {
                         pendingPlaylistUrl = null
                         dialogViewModel.postAction(DownloadDialogViewModel.Action.Reset)
+                    },
+                )
+            }
+
+            // Confirmation dialog for smart actions
+            showConfirmDialog?.let { action ->
+                AlertDialog(
+                    onDismissRequest = { showConfirmDialog = null },
+                    title = {
+                        Text(
+                            when (action) {
+                                SmartAction.CancelAll -> "Cancel all downloads?"
+                                SmartAction.RemoveCompleted -> "Remove completed?"
+                                SmartAction.RemoveFailed -> "Remove failed/canceled?"
+                                SmartAction.ClearAll -> "Clear all downloads?"
+                            }
+                        )
+                    },
+                    text = {
+                        Text(
+                            when (action) {
+                                SmartAction.CancelAll -> "This will cancel $downloadingCount active download(s)."
+                                SmartAction.RemoveCompleted -> "This will remove $completedCount completed download(s) from the list."
+                                SmartAction.RemoveFailed -> "This will remove $failedCount failed/canceled download(s) from the list."
+                                SmartAction.ClearAll -> "This will remove all ${tasks.size} download(s) from the list."
+                            }
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                when (action) {
+                                    SmartAction.CancelAll -> viewModel.cancelAll()
+                                    SmartAction.RemoveCompleted -> viewModel.removeCompleted()
+                                    SmartAction.RemoveFailed -> viewModel.removeFailed()
+                                    SmartAction.ClearAll -> viewModel.clearAll()
+                                }
+                                showConfirmDialog = null
+                            }
+                        ) {
+                            Text("Confirm")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showConfirmDialog = null }) {
+                            Text("Cancel")
+                        }
                     },
                 )
             }

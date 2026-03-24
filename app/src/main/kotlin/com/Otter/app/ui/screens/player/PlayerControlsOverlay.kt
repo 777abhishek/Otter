@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay10
+import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.VideoSettings
 import androidx.compose.material3.CircularProgressIndicator
@@ -81,6 +82,8 @@ fun PlayerControlsOverlay(
     onShowQueue: () -> Unit,
     onShowChapters: () -> Unit,
     onShowInfo: (() -> Unit)? = null,
+    onShowCaptions: () -> Unit = {},
+    hasCaptions: Boolean = false,
     hasChapters: Boolean,
     hasQueue: Boolean = false,
     modifier: Modifier = Modifier,
@@ -93,7 +96,7 @@ fun PlayerControlsOverlay(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(topGradient))
-                    .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 24.dp),
+                    .padding(start = 4.dp, end = 4.dp, top = if (isFullscreen) 6.dp else 32.dp, bottom = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Back
@@ -127,6 +130,18 @@ fun PlayerControlsOverlay(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+
+            // CC — captions button
+            if (hasCaptions) {
+                IconButton(onClick = onShowCaptions, modifier = Modifier.size(44.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Subtitles,
+                        contentDescription = "Captions",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
 
             // Tune — only icon on the right of the top bar

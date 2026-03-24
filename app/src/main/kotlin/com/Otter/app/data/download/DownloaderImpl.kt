@@ -497,6 +497,9 @@ class DownloaderImpl
                             scanFileToMediaLibrary(filePath)
                         }
 
+                        // Delay before stopping foreground service to show completion notification
+                        kotlinx.coroutines.delay(1500)
+
                         // Stop foreground service when download completes
                         val stopIntent =
                             Intent(appContext, DownloadForegroundService::class.java).apply {
@@ -524,6 +527,9 @@ class DownloaderImpl
                                 status = NotificationStatus.CANCELLED,
                             )
 
+                            // Delay before stopping foreground service to show cancellation notification
+                            kotlinx.coroutines.delay(1000)
+
                             // Stop foreground service when download is cancelled
                             val stopIntent =
                                 Intent(appContext, DownloadForegroundService::class.java).apply {
@@ -550,6 +556,9 @@ class DownloaderImpl
                             uploader = info?.uploader,
                             status = NotificationStatus.FAILED,
                         )
+
+                        // Delay before stopping foreground service to show failure notification
+                        kotlinx.coroutines.delay(1000)
 
                         // Stop foreground service when download fails
                         val stopIntent =

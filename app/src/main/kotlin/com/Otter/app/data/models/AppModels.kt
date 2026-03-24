@@ -57,7 +57,21 @@ data class AppSettings(
             SponsorBlockCategory.OUTRO,
         ),
     val showMiniPlayerInAudioMode: Boolean = true,
+
+    // Updates automation
+    val updatesAutomationEnabled: Boolean = false,
+    val updatesAutomationInterval: UpdatesAutomationInterval = UpdatesAutomationInterval.DAILY,
+    val updatesAutomationNotify: Boolean = true,
+    val updatesAutomationAutoDownloadApk: Boolean = false,
+    val updatesAutomationAutoUpdateYtDlp: Boolean = true,
+    val updatesAutomationAutoCheckNewPipe: Boolean = true,
+    val updatesAutomationAutoClearCache: Boolean = false,
 )
+
+enum class UpdatesAutomationInterval {
+    DAILY,
+    WEEKLY,
+}
 
 enum class ThemeMode {
     LIGHT,

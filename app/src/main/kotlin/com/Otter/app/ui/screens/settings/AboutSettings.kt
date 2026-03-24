@@ -135,27 +135,15 @@ fun AboutSettings(
             }
         }
 
-        // Links Section
+        // Project & links section
         Material3ExpressiveSettingsGroup(
             modifier = Modifier.fillMaxWidth(),
             items = listOf(
                 {
                     ModernInfoItem(
-                        icon = { Icon(Icons.Rounded.SystemUpdate, null, modifier = Modifier.size(22.dp)) },
-                        title = "App updates",
-                        subtitle = "Check, download, and install",
-                        onClick = { navController.navigate("appUpdates") },
-                        showArrow = true,
-                        iconBackgroundColor = iconBgColor,
-                        iconContentColor = iconStyleColor,
-                        iconShape = settings.iconShape,
-                    )
-                },
-                {
-                    ModernInfoItem(
                         icon = { Icon(Icons.Rounded.Description, null, modifier = Modifier.size(22.dp)) },
                         title = "Changelog",
-                        subtitle = "What\'s new",
+                        subtitle = "What's new in this version",
                         onClick = { navController.navigate("changelog") },
                         showArrow = true,
                         iconBackgroundColor = iconBgColor,
@@ -236,74 +224,80 @@ fun AboutSettings(
             modifier = Modifier.fillMaxWidth(),
             items = listOf(
                 {
-                    FeatureItem(
-                        icon = Icons.Rounded.VideoLibrary,
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.VideoLibrary, null, modifier = Modifier.size(22.dp)) },
                         title = "YouTube Download",
-                        description = "Download videos, audio, and subtitles",
+                        subtitle = "Download videos in any quality, extract audio, or grab subtitles. Supports batch downloads and custom formats.",
+                        onClick = null,
+                        showArrow = false,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
                     )
                 },
                 {
-                    FeatureItem(
-                        icon = Icons.Rounded.PlayArrow,
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(22.dp)) },
                         title = "Built-in Player",
-                        description = "Play content directly in the app",
+                        subtitle = "Stream content directly with gesture controls, background playback, and Picture-in-Picture support.",
+                        onClick = null,
+                        showArrow = false,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
                     )
                 },
                 {
-                    FeatureItem(
-                        icon = Icons.Rounded.CloudSync,
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.CloudSync, null, modifier = Modifier.size(22.dp)) },
                         title = "Background Sync",
-                        description = "Sync your library automatically",
+                        subtitle = "Automatically sync your library and subscriptions. Keep everything up to date without manual refresh.",
+                        onClick = null,
+                        showArrow = false,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
                     )
                 },
                 {
-                    FeatureItem(
-                        icon = Icons.Rounded.Palette,
-                        title = "Material You",
-                        description = "Beautiful, modern Material 3 design",
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.Palette, null, modifier = Modifier.size(22.dp)) },
+                        title = "Material You Design",
+                        subtitle = "Beautiful, modern Material 3 design with dynamic colors, expressive shapes, and smooth animations.",
+                        onClick = null,
+                        showArrow = false,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
+                    )
+                },
+                {
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.Security, null, modifier = Modifier.size(22.dp)) },
+                        title = "Privacy Focused",
+                        subtitle = "No ads, no tracking, no data collection. Your viewing habits stay on your device.",
+                        onClick = null,
+                        showArrow = false,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
+                    )
+                },
+                {
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.OfflineBolt, null, modifier = Modifier.size(22.dp)) },
+                        title = "Offline Mode",
+                        subtitle = "Watch downloaded content anywhere without internet. Perfect for travel and commutes.",
+                        onClick = null,
+                        showArrow = false,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
                     )
                 }
             )
         )
 
         Spacer(modifier = Modifier.height(80.dp))
-    }
-}
-
-@Composable
-private fun FeatureItem(
-    icon: ImageVector,
-    title: String,
-    description: String,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(28.dp),
-        )
-        Column(
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }

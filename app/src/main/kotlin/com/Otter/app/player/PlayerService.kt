@@ -633,29 +633,9 @@ class PlayerService : MediaSessionService() {
                                             return
                                         }
                                         
-                                        // Auto-play: if playWhenReady is true and user hasn't paused, start playback
-                                        // playWhenReady was set BEFORE prepare() so it should already be true
-                                        if (!userPaused && exoPlayer.playWhenReady) {
-                                            // Immediate play attempt
-                                            runCatching { exoPlayer.play() }
-                                            
-                                            // Multi-stage retry for stubborn streams
-                                            autoPlayRetryJob = serviceScope.launch {
-                                                repeat(5) { attempt ->
-                                                    delay((attempt + 1) * 200L) // 200ms, 400ms, 600ms, 800ms, 1000ms
-                                                    if (!userPaused && exoPlayer.playWhenReady && !exoPlayer.isPlaying) {
-                                                        Log.d(logTag, "Auto-play retry attempt ${attempt + 1}")
-                                                        runCatching { exoPlayer.play() }
-                                                        if (exoPlayer.isPlaying) return@launch
-                                                    }
-                                                }
-                                                // Final fallback: reload if still not playing
-                                                if (!userPaused && exoPlayer.playWhenReady && !exoPlayer.isPlaying) {
-                                                    Log.w(logTag, "Auto-play failed after retries, reloading")
-                                                    reloadCurrentItemAtCurrentPosition()
-                                                }
-                                            }
-                                        }
+                                        // ExoPlayer automatically plays when playWhenReady=true and STATE_READY
+                                        // No need to manually call play() - it's already handled by the player
+                                        // Just update the UI state
                                         updatePlaybackStateFromPlayer()
                                     }
                                     Player.STATE_ENDED -> {

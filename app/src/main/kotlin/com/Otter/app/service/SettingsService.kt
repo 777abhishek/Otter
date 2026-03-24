@@ -14,6 +14,7 @@ import com.Otter.app.data.models.StorageStats
 import com.Otter.app.data.models.StreamFormatPreference
 import com.Otter.app.data.models.StreamingQuality
 import com.Otter.app.data.models.ThemeMode
+import com.Otter.app.data.models.UpdatesAutomationInterval
 import com.Otter.app.data.models.UserProfile
 import com.Otter.app.data.models.VideoQuality
 import kotlinx.coroutines.flow.Flow
@@ -111,6 +112,21 @@ interface SettingsService {
     suspend fun setSponsorBlockCategories(categories: Set<SponsorBlockCategory>): Result<Unit>
 
     suspend fun setShowMiniPlayerInAudioMode(enabled: Boolean): Result<Unit>
+
+    // Updates automation
+    suspend fun setUpdatesAutomationEnabled(enabled: Boolean): Result<Unit>
+
+    suspend fun setUpdatesAutomationInterval(interval: UpdatesAutomationInterval): Result<Unit>
+
+    suspend fun setUpdatesAutomationNotify(enabled: Boolean): Result<Unit>
+
+    suspend fun setUpdatesAutomationAutoDownloadApk(enabled: Boolean): Result<Unit>
+
+    suspend fun setUpdatesAutomationAutoUpdateYtDlp(enabled: Boolean): Result<Unit>
+
+    suspend fun setUpdatesAutomationAutoCheckNewPipe(enabled: Boolean): Result<Unit>
+
+    suspend fun setUpdatesAutomationAutoClearCache(enabled: Boolean): Result<Unit>
 }
 
 interface StorageService {

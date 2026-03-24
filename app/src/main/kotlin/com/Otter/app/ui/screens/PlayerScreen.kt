@@ -5,17 +5,22 @@ package com.Otter.app.ui.screens
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
-import android.content.pm.ActivityInfo
+import android.graphics.drawable.ColorDrawable
 import android.media.AudioManager
 import android.os.Build
+import android.content.pm.ActivityInfo
+import android.view.OrientationEventListener
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.core.view.WindowCompat
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -111,6 +117,7 @@ fun PlayerScreen(
     var showBrightnessHUD by remember { mutableStateOf(false) }
     var showVolumeHUD by remember { mutableStateOf(false) }
     var hudText by remember { mutableStateOf("") }
+val act = LocalContext.current as? Activity
 
     val coroutineScope = rememberCoroutineScope()
     var controlsHideJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
@@ -138,7 +145,7 @@ fun PlayerScreen(
         controlsHideJob =
             coroutineScope.launch {
                 delay(3000)
-                if (isPlaying) showControls = false
+                if (playerConnectionManager.isPlaying.value) showControls = false
             }
     }
 
@@ -151,6 +158,12 @@ fun PlayerScreen(
         viewModel.loadVideo(videoId)
 
         onDispose { }
+    }
+
+    LaunchedEffect(isBuffering) {
+        if (!isBuffering && playerConnectionManager.isPlaying.value) {
+            resetControlsTimer()
+        }
     }
 
     // Keep settings UI state in sync with persisted settings. Without this, the sheet defaults to
@@ -226,22 +239,45 @@ fun PlayerScreen(
         }
     }
 
+    // Auto-rotate: sensor controls orientation in fullscreen, portrait locked otherwise
     LaunchedEffect(isFullscreen) {
         activity?.let {
-            if (isFullscreen) {
-                it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                it.window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-
-                val controller = WindowInsetsControllerCompat(it.window, it.window.decorView)
-                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                controller.hide(WindowInsetsCompat.Type.systemBars())
+            it.requestedOrientation = if (isFullscreen) {
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR  // Allow sensor to control orientation
             } else {
-                it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                it.window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-
-                val controller = WindowInsetsControllerCompat(it.window, it.window.decorView)
-                controller.show(WindowInsetsCompat.Type.systemBars())
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT   // Allow sensor to control orientation
             }
+        }
+    }
+
+    // Auto-switch fullscreen based on physical rotation
+    DisposableEffect(activity) {
+        val act = activity ?: return@DisposableEffect onDispose {}
+
+        val orientationListener = object : OrientationEventListener(act) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+
+                // Landscape right (phone rotated left) or left (phone rotated right)
+                val isLandscape = (orientation in 60..120) || (orientation in 240..300)
+                // Portrait (phone upright or flipped)
+                val isPortrait = (orientation in 0..30) || (orientation in 330..360) || (orientation in 150..210)
+
+                when {
+                    isLandscape && !isFullscreen -> isFullscreen = true
+                    isPortrait && isFullscreen -> isFullscreen = false
+                }
+            }
+        }
+
+        if (orientationListener.canDetectOrientation()) {
+            orientationListener.enable()
+        }
+
+        onDispose {
+            orientationListener.disable()
+            // Reset orientation when leaving player
+            act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
 
@@ -252,27 +288,41 @@ fun PlayerScreen(
         val window = act.window
         val previousStatusBarColor = window.statusBarColor
         val previousNavigationBarColor = window.navigationBarColor
+        val previousIsNavigationBarContrastEnforced = window.isNavigationBarContrastEnforced
+        val previousBackground = window.decorView.background
         val previousController = WindowInsetsControllerCompat(window, act.window.decorView)
         val previousLightStatusBars = previousController.isAppearanceLightStatusBars
         val previousLightNavigationBars = previousController.isAppearanceLightNavigationBars
 
-        window.statusBarColor = android.graphics.Color.BLACK
-        window.navigationBarColor = android.graphics.Color.BLACK
-
+        // Hide system bars immediately
         val controller = WindowInsetsControllerCompat(window, act.window.decorView)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        window.isNavigationBarContrastEnforced = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.decorView.systemUiVisibility = (
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            )
+        }
+        window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
         controller.isAppearanceLightStatusBars = false
         controller.isAppearanceLightNavigationBars = false
 
-        // Hide system bars completely in player
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-
         onDispose {
+            // Restore normal window behavior
             window.statusBarColor = previousStatusBarColor
             window.navigationBarColor = previousNavigationBarColor
+            window.isNavigationBarContrastEnforced = previousIsNavigationBarContrastEnforced
+            window.decorView.background = previousBackground
             val restoreController = WindowInsetsControllerCompat(window, act.window.decorView)
             restoreController.isAppearanceLightStatusBars = previousLightStatusBars
             restoreController.isAppearanceLightNavigationBars = previousLightNavigationBars
+            restoreController.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
@@ -301,13 +351,20 @@ fun PlayerScreen(
             animationSpec = tween(durationMillis = 220),
             modifier = Modifier.fillMaxSize(),
         ) { hasVideo ->
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = if (isFullscreen) Alignment.TopStart else Alignment.Center
+            ) {
                 if (hasVideo) {
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .then(if (isFullscreen) Modifier.fillMaxHeight() else Modifier.aspectRatio(16f / 9f)),
+                                .background(Color.Black) // Black background for video container
+                                .then(
+                                    if (isFullscreen) Modifier.fillMaxSize()
+                                    else Modifier.aspectRatio(16f / 9f)
+                                ),
                         contentAlignment = Alignment.Center,
                     ) {
                         VideoPlayerView(
@@ -384,7 +441,7 @@ fun PlayerScreen(
                                                     val base = startVolume ?: audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
                                                     val step = (delta * maxVol).toInt()
                                                     val next = (base + step).coerceIn(0, maxVol)
-                                                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, next, AudioManager.FLAG_SHOW_UI)
+                                                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, next, 0)
 
                                                     showVolumeHUD = true
                                                     hudText = "$next/$maxVol"
@@ -397,28 +454,86 @@ fun PlayerScreen(
                                             },
                                         )
                                     },
-                            resizeMode = if (isFullscreen) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT,
+                            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
                             onTap = { },
                         )
                     }
 
                     AnimatedVisibility(
                         visible = showBrightnessHUD || showVolumeHUD,
-                        enter = fadeIn(),
-                        exit = fadeOut(),
+                        enter = fadeIn(animationSpec = tween(150)),
+                        exit = fadeOut(animationSpec = tween(150)),
                     ) {
+                        // Minimal HUD - positioned vertically on the sides, away from center controls
                         Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 20.dp, vertical = 60.dp),
+                            contentAlignment = if (showBrightnessHUD) Alignment.CenterStart else Alignment.CenterEnd
                         ) {
-                            Text(
-                                hudText,
-                                color = Color.White,
-                                style = MaterialTheme.typography.titleMedium,
-                            )
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.7f),
+                                shape = MaterialTheme.shapes.extraLarge,
+                                modifier = Modifier
+                                    .height(180.dp)
+                                    .widthIn(min = 56.dp, max = 64.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(vertical = 12.dp, horizontal = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    // Icon
+                                    Icon(
+                                        imageVector = if (showBrightnessHUD) 
+                                            androidx.compose.material.icons.Icons.Rounded.BrightnessHigh
+                                        else 
+                                            androidx.compose.material.icons.Icons.Rounded.VolumeUp,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    // Vertical progress indicator
+                                    Box(
+                                        modifier = Modifier
+                                            .width(4.dp)
+                                            .height(100.dp)
+                                            .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp)),
+                                        contentAlignment = Alignment.BottomCenter
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .fillMaxHeight(
+                                                    if (showBrightnessHUD) {
+                                                        (act?.window?.attributes?.screenBrightness ?: 0.5f).coerceIn(0f, 1f)
+                                                    } else {
+                                                        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                                                        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+                                                        (currentVol / maxVol).coerceIn(0f, 1f)
+                                                    }
+                                                )
+                                                .background(Color.White, RoundedCornerShape(2.dp))
+                                        )
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    // Value text
+                                    Text(
+                                        text = hudText,
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 } else {
@@ -451,7 +566,7 @@ fun PlayerScreen(
         }
 
         AnimatedVisibility(
-            visible = !isInPip,
+            visible = !isInPip && showControls,
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
@@ -473,6 +588,7 @@ fun PlayerScreen(
                 duration = duration,
                 currentPosition = currentPosition,
                 isFullscreen = isFullscreen,
+                showCenterControls = showControls,
                 onQualityClick = {
                     showQualitySheet = true
                     resetControlsTimer()
@@ -498,7 +614,12 @@ fun PlayerScreen(
                     resetControlsTimer()
                 },
                 onFullscreenToggle = {
-                    isFullscreen = !isFullscreen
+                    val enteringFullscreen = !isFullscreen
+                    isFullscreen = enteringFullscreen
+                    val act = activity
+                    if (act != null) {
+                        act.requestedOrientation = if (enteringFullscreen) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    }
                     resetControlsTimer()
                 },
                 onPipClick = {
@@ -527,10 +648,87 @@ fun PlayerScreen(
                     showBottomSheet = true
                     resetControlsTimer()
                 },
+                onShowCaptions = {
+                    showPlaybackSettingsSheet = true
+                    resetControlsTimer()
+                },
+                hasCaptions = captionTrackGroups.isNotEmpty(),
                 hasChapters = chapters.isNotEmpty(),
                 hasQueue = queue.size > 1,
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+
+        // Lightweight "Up Next" strip showing the next item in the active queue.
+        // This does not change service behaviour (auto-next is handled in PlayerService)
+        // but gives the user more context and a manual "Next" action.
+        // Only shows: near video end (last 15s), portrait mode, above progress bar
+        val upNextItem = remember(sessionQueue, sessionQueueIndex) {
+            sessionQueue.getOrNull(sessionQueueIndex + 1)
+        }
+        val isNearEnd = remember(currentPosition, duration) {
+            duration > 0 && currentPosition >= (duration - 15_000) // Last 15 seconds
+        }
+        AnimatedVisibility(
+            visible = !isInPip && !isFullscreen && upNextItem != null && isNearEnd,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 100.dp), // Above progress bar
+        ) {
+            Surface(
+                tonalElevation = 4.dp,
+                shape = MaterialTheme.shapes.large,
+                color = Color.Black.copy(alpha = 0.7f),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = "Up next",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White.copy(alpha = 0.7f),
+                        )
+                        Text(
+                            text = upNextItem?.title.orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White,
+                            maxLines = 1,
+                        )
+                    }
+
+                    TextButton(
+                        onClick = {
+                            val index = sessionQueueIndex + 1
+                            val item = sessionQueue.getOrNull(index) ?: return@TextButton
+                            viewModel.playQueueItem(index)
+                            playerConnectionManager.play(
+                                videoId = item.videoId,
+                                title = item.title,
+                                thumbnailUrl = item.thumbnailUrl,
+                                duration = item.duration,
+                                uploaderName = item.uploaderName,
+                                queue = sessionQueue,
+                                queuePosition = index,
+                            )
+                        },
+                    ) {
+                        Text(
+                            text = "Play next",
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
         }
 
         val availableQualities by viewModel.availableQualities.collectAsStateWithLifecycle()
@@ -565,6 +763,19 @@ fun PlayerScreen(
             onCaptionsEnabledChanged = { enabled ->
                 captionsEnabled = enabled
                 playerConnectionManager.setCaptionsEnabled(enabled)
+
+                // When enabling captions, if nothing is selected yet but tracks are available,
+                // auto-select the first caption track so that the overlay actually appears.
+                if (enabled) {
+                    val groups = captionTrackGroups
+                    val hasSelected = groups.any { it.isSelected }
+                    if (!hasSelected) {
+                        val first = groups.firstOrNull()
+                        if (first != null) {
+                            playerConnectionManager.selectCaptionTrack(first.groupIndex, first.trackIndex)
+                        }
+                    }
+                }
             },
             onCaptionLanguageSelected = { lang ->
                 selectedCaptionLanguage = lang
@@ -657,16 +868,22 @@ fun PlayerScreen(
             currentIndex = sessionQueueIndex,
             onQueueItemClick = { index ->
                 val item = sessionQueue.getOrNull(index) ?: return@PlayerQueueBottomSheet
-                viewModel.playQueueItem(index)
-                playerConnectionManager.play(
-                    videoId = item.videoId,
-                    title = item.title,
-                    thumbnailUrl = item.thumbnailUrl,
-                    duration = item.duration,
-                    uploaderName = item.uploaderName,
-                    queue = sessionQueue,
-                    queuePosition = index,
-                )
+                if (item.videoId != videoId) {
+                    navController.navigate("player/${item.videoId}") {
+                        popUpTo("player/$videoId") { inclusive = true }
+                    }
+                } else {
+                    viewModel.playQueueItem(index)
+                    playerConnectionManager.play(
+                        videoId = item.videoId,
+                        title = item.title,
+                        thumbnailUrl = item.thumbnailUrl,
+                        duration = item.duration,
+                        uploaderName = item.uploaderName,
+                        queue = sessionQueue,
+                        queuePosition = index,
+                    )
+                }
                 showBottomSheet = false
             },
             chapters = chapters,

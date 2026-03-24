@@ -2,11 +2,13 @@ package com.Otter.app.service
 
 import android.app.Notification
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.Otter.app.R
@@ -31,6 +33,7 @@ class DownloadForegroundService : Service() {
         private const val CHANNEL_NAME = "Downloads"
         const val ACTION_START = "com.Otter.app.action.START_DOWNLOAD"
         const val ACTION_STOP = "com.Otter.app.action.STOP_DOWNLOAD"
+        private const val WAKE_LOCK_TAG = "Otter:DownloadWakeLock"
     }
 
     @Inject
@@ -39,6 +42,12 @@ class DownloadForegroundService : Service() {
     private val binder = LocalBinder()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var isServiceRunning = false
+    
+    // WakeLock to keep CPU running when screen is off
+    private var wakeLock: PowerManager.WakeLock? = null
+    private val powerManager: PowerManager by lazy {
+        getSystemService(Context.POWER_SERVICE) as PowerManager
+    }
 
     inner class LocalBinder : Binder() {
         fun getService(): DownloadForegroundService = this@DownloadForegroundService
@@ -96,6 +105,9 @@ class DownloadForegroundService : Service() {
             notificationManager.createNotificationChannel(channel)
         }
 
+        // Acquire WakeLock to keep CPU running when screen is off
+        acquireWakeLock()
+
         // Create initial notification
         val notification = createInitialNotification()
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
@@ -109,9 +121,65 @@ class DownloadForegroundService : Service() {
         observeNotificationState()
     }
 
+    /**
+     * Acquire a partial WakeLock to keep CPU running during downloads
+     */
+    private fun acquireWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) return
+            
+            wakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                WAKE_LOCK_TAG
+            ).apply {
+                // Use reference counting for indefinite lock - will be released when service stops
+                setReferenceCounted(true)
+                acquire()
+            }
+        } catch (e: Exception) {
+            // WakeLock acquisition failed, downloads will still work but may pause when screen off
+        }
+    }
+
+    /**
+     * Extend the WakeLock duration for long downloads
+     */
+    fun extendWakeLock(durationMs: Long = 10 * 60 * 1000L) {
+        try {
+            wakeLock?.let {
+                if (it.isHeld) {
+                    it.acquire(durationMs)
+                } else {
+                    acquireWakeLock()
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore WakeLock errors
+        }
+    }
+
+    /**
+     * Release the WakeLock when downloads complete
+     */
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.let {
+                if (it.isHeld) {
+                    it.release()
+                }
+            }
+            wakeLock = null
+        } catch (e: Exception) {
+            // Ignore WakeLock errors
+        }
+    }
+
     private fun stopForegroundService() {
         if (!isServiceRunning) return
 
+        // Release WakeLock when service stops
+        releaseWakeLock()
+        
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         isServiceRunning = false
@@ -148,6 +216,7 @@ class DownloadForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        releaseWakeLock()
         serviceScope.cancel()
     }
 }

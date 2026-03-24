@@ -191,9 +191,28 @@ class NotificationManager
 
             if (!shouldPostDownloadNotifications()) return
 
-            val notification = buildNotification(state)
-            kotlin.runCatching {
-                notificationManager.notify(NOTIFICATION_ID_DOWNLOAD, notification)
+            // For completed/failed/cancelled status, show a final notification then auto-dismiss after delay
+            when (status) {
+                NotificationStatus.COMPLETED, NotificationStatus.FAILED, NotificationStatus.CANCELLED -> {
+                    val notification = buildNotification(state)
+                    kotlin.runCatching {
+                        notificationManager.notify(NOTIFICATION_ID_DOWNLOAD, notification)
+                    }
+                    // Auto-dismiss completed/error notifications after 5 seconds
+                    scope.launch {
+                        kotlinx.coroutines.delay(5000)
+                        // Only cancel if this is still the same task
+                        if (_notificationState.value?.taskId == taskId) {
+                            cancelNotification()
+                        }
+                    }
+                }
+                else -> {
+                    val notification = buildNotification(state)
+                    kotlin.runCatching {
+                        notificationManager.notify(NOTIFICATION_ID_DOWNLOAD, notification)
+                    }
+                }
             }
         }
 
@@ -306,8 +325,22 @@ class NotificationManager
                     .setContentTitle(contentTitle)
                     .setContentText(contentText)
                     .setOngoing(state.status == NotificationStatus.DOWNLOADING)
-                    .setProgress(100, (state.progress * 100).toInt(), state.progress == 0f)
                     .setOnlyAlertOnce(true)
+
+            // Set progress bar based on status
+            when (state.status) {
+                NotificationStatus.DOWNLOADING -> {
+                    builder.setProgress(100, (state.progress * 100).toInt(), state.progress == 0f)
+                }
+                NotificationStatus.COMPLETED -> {
+                    // Show 100% completed progress, then remove
+                    builder.setProgress(0, 0, false)
+                }
+                else -> {
+                    // For failed/cancelled/paused/queued, show indeterminate or no progress
+                    builder.setProgress(0, 0, false)
+                }
+            }
 
             // Add content intent
             val contentIntent =

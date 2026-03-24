@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.util.UnstableApi
@@ -72,7 +73,6 @@ import com.Otter.app.ui.screens.PlaylistScreen
 import com.Otter.app.ui.screens.WebViewLoginScreen
 import com.Otter.app.ui.screens.settings.AboutSettings
 import com.Otter.app.ui.screens.settings.AppearanceSettingsScreen
-import com.Otter.app.ui.screens.settings.AppUpdatesScreen
 import com.Otter.app.ui.screens.settings.BackupAndRestore
 import com.Otter.app.ui.screens.settings.ChangelogScreen
 import com.Otter.app.ui.screens.settings.ContentSettings
@@ -141,6 +141,13 @@ class MainActivity : ComponentActivity() {
         
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        window.isNavigationBarContrastEnforced = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
 
         setContent {
             Otter(onRestartApp = { restartApp(this) })
@@ -318,6 +325,8 @@ fun Otter(onRestartApp: () -> Unit = {}) {
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 androidx.compose.material3.Scaffold(
+                    containerColor = if (isPlayerScreen) Color.Black else MaterialTheme.colorScheme.background,
+                    contentColor = if (isPlayerScreen) Color.Black else MaterialTheme.colorScheme.onBackground,
                     bottomBar = {
                         OtterBottomNavigation(
                             selectedRoute = selectedRoute,
@@ -338,7 +347,7 @@ fun Otter(onRestartApp: () -> Unit = {}) {
                     NavHost(
                         navController = navController,
                         startDestination = startDestination,
-                        modifier = Modifier.padding(padding),
+                        modifier = if (isPlayerScreen) Modifier.fillMaxSize() else Modifier.padding(padding),
                         enterTransition = {
                             slideInHorizontally(
                                 initialOffsetX = { it },
@@ -537,12 +546,7 @@ fun Otter(onRestartApp: () -> Unit = {}) {
                             )
                         }
 
-                        composable("appUpdates") {
-                            AppUpdatesScreen(
-                                navController = navController,
-                                onBack = { navController.popBackStack() },
-                            )
-                        }
+                        
 
                         composable("changelog") {
                             ChangelogScreen(

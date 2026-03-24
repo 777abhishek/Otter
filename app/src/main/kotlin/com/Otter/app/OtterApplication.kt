@@ -10,14 +10,18 @@ import com.Otter.app.network.AnalyticsService
 import com.Otter.app.network.CrashReportService
 import com.Otter.app.network.PrivacySyncService
 import com.Otter.app.service.SettingsService
+import com.Otter.app.service.StorageService
 import com.Otter.app.util.CrashReportManager
 import com.Otter.app.util.FileLogger
 import com.Otter.app.util.PreferenceUtil
+import com.Otter.app.work.PlaylistWorkScheduler
 import com.Otter.app.work.SyncWorkScheduler
-import com.yausername.ffmpeg.FFmpeg
+import com.Otter.app.work.UpdatesWorkScheduler
 import dagger.hilt.android.HiltAndroidApp
+import com.yausername.ffmpeg.FFmpeg
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -127,6 +131,21 @@ class OtterApplication : Application(), Configuration.Provider {
                         SyncWorkScheduler.schedule(this@OtterApplication)
                     } else {
                         SyncWorkScheduler.cancel(this@OtterApplication)
+                    }
+                }
+        }
+
+        // Periodic background updates automation
+        applicationScope.launch {
+            settingsService.getSettings()
+                .map { it.updatesAutomationEnabled to it.updatesAutomationInterval }
+                .distinctUntilChanged()
+                .collect { (enabled, interval) ->
+                    if (enabled) {
+                        val hours = if (interval == com.Otter.app.data.models.UpdatesAutomationInterval.WEEKLY) 24L * 7L else 24L
+                        UpdatesWorkScheduler.schedule(this@OtterApplication, intervalHours = hours)
+                    } else {
+                        UpdatesWorkScheduler.cancel(this@OtterApplication)
                     }
                 }
         }

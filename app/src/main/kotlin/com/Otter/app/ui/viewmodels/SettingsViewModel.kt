@@ -17,6 +17,7 @@ import com.Otter.app.data.models.SponsorBlockCategory
 import com.Otter.app.data.models.StreamFormatPreference
 import com.Otter.app.data.models.StreamingQuality
 import com.Otter.app.data.models.ThemeMode
+import com.Otter.app.data.models.UpdatesAutomationInterval
 import com.Otter.app.data.models.VideoQuality
 import com.Otter.app.network.PrivacySyncService
 import com.Otter.app.service.SettingsService
@@ -217,6 +218,49 @@ class SettingsViewModel
         fun setPlayerButtonsStyle(style: PlayerButtonsStyle) {
             viewModelScope.launch {
                 settingsService.setPlayerButtonsStyle(style)
+            }
+        }
+
+        // Updates automation
+        fun setUpdatesAutomationEnabled(enabled: Boolean) {
+            viewModelScope.launch {
+                settingsService.setUpdatesAutomationEnabled(enabled)
+            }
+        }
+
+        fun setUpdatesAutomationInterval(interval: UpdatesAutomationInterval) {
+            viewModelScope.launch {
+                settingsService.setUpdatesAutomationInterval(interval)
+            }
+        }
+
+        fun setUpdatesAutomationNotify(enabled: Boolean) {
+            viewModelScope.launch {
+                settingsService.setUpdatesAutomationNotify(enabled)
+            }
+        }
+
+        fun setUpdatesAutomationAutoDownloadApk(enabled: Boolean) {
+            viewModelScope.launch {
+                settingsService.setUpdatesAutomationAutoDownloadApk(enabled)
+            }
+        }
+
+        fun setUpdatesAutomationAutoUpdateYtDlp(enabled: Boolean) {
+            viewModelScope.launch {
+                settingsService.setUpdatesAutomationAutoUpdateYtDlp(enabled)
+            }
+        }
+
+        fun setUpdatesAutomationAutoCheckNewPipe(enabled: Boolean) {
+            viewModelScope.launch {
+                settingsService.setUpdatesAutomationAutoCheckNewPipe(enabled)
+            }
+        }
+
+        fun setUpdatesAutomationAutoClearCache(enabled: Boolean) {
+            viewModelScope.launch {
+                settingsService.setUpdatesAutomationAutoClearCache(enabled)
             }
         }
 
