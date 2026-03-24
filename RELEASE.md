@@ -1,4 +1,61 @@
-# GitHub Release Notes (v2.0.0)
+# GitHub Release Notes (v2.0.1)
+
+## Highlights
+This patch release resolves **critical player screen bugs** affecting video playback, orientation controls, and UI conflicts.
+
+---
+
+## 🐛 Bug Fixes
+
+### 🎥 Video Player Issues
+- **Fixed**: Black screen with audio-only playback - video surface now properly attaches during recomposition
+  - Resolved SurfaceView detachment that occurred when PlayerScreen recomposed rapidly
+  - Video now displays correctly while audio plays
+- **Fixed**: Status bar gap flash when entering player screen
+  - Moved system bar hiding logic before first frame rendering
+  - Eliminates visible theme color flash/gap on player entry
+- **Fixed**: Edge-to-edge layout corruption after leaving player screen
+  - Removed incorrect `setDecorFitsSystemWindows(window, true)` onDispose
+  - Preserves app-wide edge-to-edge layout consistency
+
+### 📱 Orientation & Controls
+- **Fixed**: Orientation conflict loop preventing return to portrait mode
+  - Changed `SCREEN_ORIENTATION_SENSOR_LANDSCAPE` to `SCREEN_ORIENTATION_SENSOR`
+  - Allows sensor to detect both landscape and portrait orientations
+  - Eliminates feedback loop between orientation lock and sensor
+- **Fixed**: Dual volume HUD (system + custom) appearing simultaneously
+  - Removed `AudioManager.FLAG_SHOW_UI` flag when adjusting volume
+  - Only custom volume gesture HUD now appears
+
+### ✨ Player Improvements
+- Enhanced caption auto-selection when enabling captions
+  - Automatically selects first available caption track when captions are enabled
+- Improved queue navigation with proper back stack handling
+  - Better navigation between queue items using proper NavController patterns
+
+---
+
+## Technical Details
+- **VideoPlayerView**: Removed `remember()` pattern causing SurfaceView detachment
+- **PlayerScreen**: Moved `controller.hide()` before first frame render
+- **Orientation**: Used `SCREEN_ORIENTATION_SENSOR` instead of `SCREEN_ORIENTATION_SENSOR_LANDSCAPE`
+- **Volume**: Removed `AudioManager.FLAG_SHOW_UI` to prevent system volume HUD
+
+---
+
+## Files Changed
+- `app/src/main/kotlin/com/Otter/app/ui/screens/PlayerScreen.kt`
+- `app/src/main/kotlin/com/Otter/app/ui/screens/player/VideoPlayerView.kt`
+
+---
+
+## Status
+- **Code pushed to `main`**
+- **Tag pushed: `v2.0.1`**
+
+---
+
+## Previous Release (v2.0.0)
 
 ## Highlights
 This release improves **download reliability**, **format selection clarity**, and adds a complete in-app **App Updates + Changelog** experience.
@@ -9,17 +66,12 @@ This release improves **download reliability**, **format selection clarity**, an
 
 ### In-app updates + changelog (new)
 - Added **App Updates** screen:
-  - Checks the latest GitHub release
+  - Checks latest GitHub release
   - Shows clear update states:
     - Up to date
     - Update available
     - Downloading
     - Ready to install
-  - Full-screen **update overlay** with animated **wavy progress** indicator
-  - Actions:
-    - **Download APK** when available
-    - **Open GitHub release page**
-    - **Install downloaded APK** (with unknown-sources handling)
 - Added **Changelog** screen:
   - Fetches GitHub releases
   - Displays release notes categorized into:
