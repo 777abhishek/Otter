@@ -4,269 +4,125 @@ Thank you for your interest in contributing to Otter! This document provides gui
 
 ## Code of Conduct
 
-- Be respectful and inclusive
-- Provide constructive feedback
-- Focus on what is best for the community
-- Show empathy towards other contributors
+This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Android Studio Hedgehog (2023.1.1) or newer
-- JDK 17
-- Android SDK 36 (Android 16)
+- Android Studio (latest stable or Canary version)
+- JDK 17 or higher
+- Android SDK with API level 34+
 - Git
 
-### Setup Development Environment
+### Building from Source
 
 1. Fork the repository
 2. Clone your fork:
-```bash
-git clone https://github.com/YOUR_USERNAME/Otter.git
-cd Otter
-```
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/Otter.git
+   cd Otter
+   ```
+3. Open the project in Android Studio
+4. Wait for Gradle sync to complete
+5. Build the project:
+   ```bash
+   ./gradlew assembleDebug
+   ```
 
-3. Add upstream remote:
-```bash
-git remote add upstream https://github.com/777abhishek/Otter.git
-```
+## Development Guidelines
 
-4. Create a feature branch:
-```bash
-git checkout -b feature/your-feature-name
-```
+### Code Style
 
-5. Open in Android Studio and let Gradle sync complete
-
-## Development Workflow
-
-### 1. Code Style
-
-We use Detekt and KtLint to maintain code quality:
-
-```bash
-# Check code style
-./gradlew ktlintCheck detekt
-
-# Auto-fix issues
-./gradlew ktlintFormat
-```
-
-### 2. Run Tests
-
-Before committing, run all tests:
-
-```bash
-# Unit tests
-./gradlew test
-
-# Instrumentation tests
-./gradlew connectedAndroidTest
-```
-
-### 3. Build Project
-
-Ensure the project builds successfully:
-
-```bash
-./gradlew assembleDebug
-```
-
-## Making Changes
-
-### Branch Naming
-
-Use descriptive branch names:
-- `feature/add-video-download-queue`
-- `fix/player-crash-on-rotate`
-- `docs/update-readme`
-- `refactor/clean-up-repository`
+- Follow Kotlin coding conventions
+- Use meaningful variable and function names
+- Add comments for complex logic
+- Keep functions focused and concise
 
 ### Commit Messages
 
-Follow conventional commits:
+Use clear and descriptive commit messages:
 
-```
-<type>(<scope>): <subject>
+- `feat: add new feature`
+- `fix: resolve bug in video playback`
+- `docs: update README`
+- `style: format code`
+- `refactor: restructure code`
+- `test: add unit tests`
+- `chore: update dependencies`
 
-<body>
+### Pull Request Process
 
-<footer>
-```
+1. Create a new branch from `main`:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+2. Make your changes
+3. Test your changes thoroughly
+4. Commit your changes with clear messages
+5. Push to your fork:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+6. Open a pull request to the main repository
+7. Fill in the pull request template
+8. Wait for review and address any feedback
 
-Types:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting)
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
+### Before Submitting
 
-Examples:
-```
-feat(player): add background playback support
+- Ensure your code compiles without errors
+- Run tests and ensure they pass
+- Update documentation if needed
+- Check for any formatting issues
+- Verify your changes don't break existing functionality
 
-Implement audio-only playback when screen is off.
-Uses ExoPlayer's audio focus management.
+## Reporting Issues
 
-Closes #123
-```
+### Bug Reports
 
-### Pull Request Guidelines
+When reporting a bug, please include:
 
-1. **Update documentation** if needed
-2. **Add tests** for new functionality
-3. **Ensure all tests pass**
-4. **Update CHANGELOG.md** for user-facing changes
-5. **Link related issues** in PR description
+- **Title**: Clear and concise description
+- **Description**: Detailed explanation of the issue
+- **Steps to reproduce**: Step-by-step instructions
+- **Expected behavior**: What should happen
+- **Actual behavior**: What actually happens
+- **Screenshots**: If applicable
+- **Device info**: Device model, Android version
+- **App version**: Version of Otter you're using
+- **Logs**: Relevant logcat output if available
 
-PR Template:
-```markdown
-## Description
-Brief description of changes
+### Feature Requests
 
-## Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
+When requesting a feature:
 
-## Testing
-Describe tests added/updated
+- **Title**: Clear and concise description
+- **Description**: Detailed explanation of the feature
+- **Use case**: Why this feature is needed
+- **Alternatives**: Any alternative solutions you've considered
+- **Additional context**: Any other relevant information
 
-## Checklist
-- [ ] Code follows project style
-- [ ] Tests pass locally
-- [ ] Documentation updated
-- [ ] No merge conflicts
-```
+## Translation
 
-## Code Review Process
+Otter supports multiple languages. You can help translate the app:
 
-1. Automated checks run on every PR
-2. Maintainers review code
-3. Address review comments
-4. Update PR when changes are ready
-5. Approval required for merge
+1. Visit our translation platform (to be set up)
+2. Sign up for an account
+3. Choose your language
+4. Start translating
 
-## Project Structure
+## Questions
 
-```
-app/src/main/kotlin/com/Otter/app/
-├── data/              # Data layer
-│   ├── auth/         # Authentication
-│   ├── database/     # Room database
-│   ├── download/     # Download management
-│   ├── models/       # Data models
-│   ├── repositories/ # Data repositories
-│   └── ytdlp/        # yt-dlp integration
-├── di/               # Dependency injection
-├── network/          # API services
-├── player/           # Video player
-├── service/          # Background services
-├── ui/               # UI layer
-│   ├── components/   # Reusable composables
-│   ├── download/     # Download screens
-│   ├── navigation/   # Navigation setup
-│   ├── screens/      # Screen composables
-│   ├── theme/        # Material3 theme
-│   └── viewmodels/   # ViewModels
-├── util/             # Utilities
-└── work/             # WorkManager workers
-```
+For questions or discussions:
 
-## Adding New Features
-
-1. Create feature branch
-2. Implement feature following architecture
-3. Add tests (unit + instrumentation)
-4. Update documentation
-5. Submit PR
-
-### Example: Adding a New Screen
-
-1. **Create ViewModel**:
-```kotlin
-@HiltViewModel
-class NewFeatureViewModel @Inject constructor(
-    private val repository: FeatureRepository
-) : ViewModel() {
-    // Implementation
-}
-```
-
-2. **Create Screen Composable**:
-```kotlin
-@Composable
-fun NewFeatureScreen(
-    viewModel: NewFeatureViewModel = hiltViewModel()
-) {
-    // UI implementation
-}
-```
-
-3. **Add Navigation**:
-```kotlin
-fun NavGraphBuilder.newFeatureScreen() {
-    composable("new_feature") {
-        NewFeatureScreen()
-    }
-}
-```
-
-4. **Add Tests**:
-- Unit tests for ViewModel
-- Compose tests for UI
-
-## Reporting Bugs
-
-Before reporting bugs:
-
-1. Check existing issues
-2. Verify it's not a duplicate
-3. Provide minimal reproduction
-4. Include device info and logs
-
-Bug Report Template:
-```markdown
-## Description
-Clear description of bug
-
-## Steps to Reproduce
-1. Step 1
-2. Step 2
-3. Step 3
-
-## Expected Behavior
-What should happen
-
-## Actual Behavior
-What actually happens
-
-## Environment
-- Android version:
-- App version:
-- Device:
-
-## Logs
-Relevant log output
-```
-
-## Feature Requests
-
-1. Check existing requests
-2. Use clear, descriptive title
-3. Explain use case
-4. Consider implementation complexity
-
-## Questions?
-
-- Open an issue with the `question` label
-- Join discussions in existing issues
-- Check documentation first
+- Check existing issues and discussions
+- Join our community (Telegram/Discord/Matrix - to be set up)
+- Open a new discussion for general questions
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing to Otter, you agree that your contributions will be licensed under the [GPL-3.0 License](LICENSE).
+
+## Acknowledgments
+
+Thank you to all contributors who help make Otter better!

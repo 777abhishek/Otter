@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="suggested">推荐</string>
+    <string name="audio">音频</string>
+    <string name="video_only">仅视频</string>
+    <string name="subtitle_language">字幕语言</string>
+    <string name="subtitle_suggested">推荐字幕</string>
+    <string name="auto_translated_captions">自动翻译字幕</string>
+    <string name="update_sub_language_msg">选择要更新的字幕语言</string>
+    <string name="rename">重命名</string>
+    <string name="title">标题</string>
+    <string name="confirm">确认</string>
+    <string name="dismiss">忽略</string>
+    <string name="clear">清除</string>
+    <string name="close">关闭</string>
+    <string name="start_download">开始下载</string>
+    <string name="ytdlp_update">更新 yt-dlp</string>
+</resources>

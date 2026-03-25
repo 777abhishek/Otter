@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="suggested">Sugerido</string>
+    <string name="audio">Audio</string>
+    <string name="video_only">Solo video</string>
+    <string name="subtitle_language">Idioma de subtítulos</string>
+    <string name="subtitle_suggested">Subtítulos sugeridos</string>
+    <string name="auto_translated_captions">Subtítulos traducidos automáticamente</string>
+    <string name="update_sub_language_msg">Seleccione idiomas de subtítulos para actualizar</string>
+    <string name="rename">Renombrar</string>
+    <string name="title">Título</string>
+    <string name="confirm">Confirmar</string>
+    <string name="dismiss">Descartar</string>
+    <string name="clear">Limpiar</string>
+    <string name="close">Cerrar</string>
+    <string name="start_download">Iniciar descarga</string>
+    <string name="ytdlp_update">Actualizar yt-dlp</string>
+</resources>

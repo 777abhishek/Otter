@@ -58,8 +58,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import com.Otter.app.BuildConfig
 import com.Otter.app.util.AppUpdateUtil
+import com.Otter.app.util.AppUpdateCache
 import com.Otter.app.util.ReleaseInfo
 import com.Otter.app.util.UpdateUtil
 import com.Otter.app.util.PreferenceUtil
@@ -166,20 +168,69 @@ fun UpdateCheckerScreen(
             isUpdating = true
             error = null
             downloadProgress = 0f
+            updateStatus = null
             runCatching {
                 when (updateType) {
                     UpdateType.OTTER -> {
-                        val r = AppUpdateUtil.fetchLatestRelease()
-                        val asset = r?.let { AppUpdateUtil.pickApkAsset(it) }
-                        if (asset == null) { error = "No APK found in release"; return@runCatching }
-                        val file = withContext(Dispatchers.IO) {
-                            AppUpdateUtil.downloadAssetToCache(context, asset) { downloaded, total ->
-                                downloadProgress = if (total > 0) downloaded.toFloat() / total.toFloat() else 0f
-                            }
+                        // PHASE 1: Check permission BEFORE any download
+                        val hasPermission = AppUpdateUtil.canRequestPackageInstalls(context)
+                        if (!hasPermission) {
+                            updateStatus = "Permission required"
+                            error = "Install from Unknown Sources permission required. Open settings?"
+                            AppUpdateUtil.openUnknownSourcesSettings(context)
+                            return@runCatching
                         }
-                        if (file == null) { error = "Failed to download APK"; return@runCatching }
+                        
+                        // PHASE 2: Fetch release info and check cache
+                        val release = withContext(Dispatchers.IO) {
+                            AppUpdateUtil.fetchLatestRelease()
+                        }
+                        if (release == null) {
+                            error = "Failed to fetch latest release"
+                            return@runCatching
+                        }
+                        
+                        val asset = AppUpdateUtil.pickApkAsset(release)
+                        if (asset == null) {
+                            error = "No APK found in release"
+                            return@runCatching
+                        }
+                        
+                        // Check if already cached
+                        var file = withContext(Dispatchers.IO) {
+                            AppUpdateCache.getCachedApk(context, release)
+                        }
+                        
+                        // If not cached, download it
+                        if (file == null) {
+                            file = withContext(Dispatchers.IO) {
+                                AppUpdateUtil.downloadAssetToCache(context, asset) { downloaded, total ->
+                                    downloadProgress = if (total > 0) downloaded.toFloat() / total.toFloat() else 0f
+                                }
+                            }
+                            
+                            if (file == null) {
+                                error = "Failed to download APK"
+                                return@runCatching
+                            }
+                            
+                            // Cache the newly downloaded file
+                            withContext(Dispatchers.IO) {
+                                AppUpdateCache.cacheApk(context, asset, release, file)
+                            }
+                        } else {
+                            // Using cached file
+                            downloadProgress = 1f
+                            updateStatus = "Using cached download"
+                        }
+                        
+                        // PHASE 3: Install (permission already verified in Phase 1)
                         val installed = AppUpdateUtil.tryStartInstall(context, file)
-                        if (!installed) AppUpdateUtil.openUnknownSourcesSettings(context)
+                        if (!installed) {
+                            error = "Failed to start installation"
+                        } else {
+                            updateStatus = "Installation started"
+                        }
                     }
                     UpdateType.YT_DLP -> {
                         val status = withContext(Dispatchers.IO) { UpdateUtil.updateYtDlp() }
@@ -201,6 +252,7 @@ fun UpdateCheckerScreen(
                 }
             }.onFailure {
                 error = it.message ?: "Update failed"
+                Log.e("UpdateCheckerScreen", "Update error", it)
             }
             isUpdating = false
         }
@@ -291,8 +343,13 @@ fun UpdateCheckerScreen(
                         Text(
                             text = when {
                                 isChecking -> "Checking for updates…"
-                                isUpdating && updateType == UpdateType.OTTER ->
-                                    "Downloading… ${(downloadProgress * 100).toInt()}%"
+                                isUpdating && updateType == UpdateType.OTTER -> {
+                                    when {
+                                        downloadProgress == 0f -> "Preparing download…"
+                                        downloadProgress >= 1f -> "Download complete, installing…"
+                                        else -> "Downloading… ${(downloadProgress * 100).toInt()}%"
+                                    }
+                                }
                                 else -> "Updating…"
                             },
                             style = MaterialTheme.typography.headlineMedium,
@@ -345,6 +402,7 @@ fun UpdateCheckerScreen(
                         Text(
                             text = when {
                                 error != null -> "Something went wrong"
+                                updateStatus?.contains("cached", ignoreCase = true) == true -> "Using Cache"
                                 updateStatus != null -> updateStatus!!
                                 latestRelease == null -> "Couldn't fetch release"
                                 isUpdateAvailable -> "Update available"
@@ -363,8 +421,14 @@ fun UpdateCheckerScreen(
                         Spacer(Modifier.height(8.dp))
 
                         // Version line
+                        val versionDisplay =
+                            if (isUpdateAvailable && latestVersion.isNotBlank()) {
+                                "$currentVersion  $latestVersion"
+                            } else {
+                                currentVersion
+                            }
                         Text(
-                            text = "$appName version $currentVersion",
+                            text = "$appName version $versionDisplay",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -399,7 +463,12 @@ fun UpdateCheckerScreen(
                         if (error != null) {
                             Spacer(Modifier.height(16.dp))
                             Text(
-                                text = error.orEmpty(),
+                                text = when {
+                                    (error as? String)?.contains("Permission", ignoreCase = true) == true ->
+                                        "Please enable 'Install from Unknown Sources' in Settings. " +
+                                        "Once enabled, you can retry the download without re-downloading."
+                                    else -> (error as? String).orEmpty()
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.error,
                                 textAlign = TextAlign.Center,

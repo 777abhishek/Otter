@@ -1,3 +1,64 @@
+# Otter v2.0.4 - GitHub Best Practices & Multi-language Support
+
+## Download
+[Download APK](../../releases/download/v2.0.4/app-release.apk)
+
+## Overview
+This release focuses on improving project infrastructure, documentation, and community guidelines. We've added essential GitHub best practices to make Otter more accessible to contributors and users.
+
+## Key Changes
+
+### Project Infrastructure
+- **Code of Conduct**: Established community guidelines for respectful and inclusive collaboration
+- **Contributing Guidelines**: Comprehensive guide for contributors including build instructions, PR process, and coding standards
+- **License**: Added GPL-3.0 License to clarify usage and distribution rights
+- **Fastlane**: Automated release pipeline for streamlined deployment to Google Play Store
+
+### Multi-language Support
+- Added string resource files for 5 languages:
+  - Spanish (es)
+  - French (fr)
+  - German (de)
+  - Japanese (ja)
+  - Chinese (zh)
+- Infrastructure ready for community translations
+
+### Documentation
+- **CHANGELOG.md**: Comprehensive changelog tracking all version changes
+- **Fastlane README**: Documentation for automated release process
+- Improved project documentation structure
+
+### UI/UX Improvements
+- Reduced vertical spacing between video and playlist cards for better visual compactness
+- Enhanced notification system with separate channels for different operations
+
+### Fixes
+- Update Checker screen now correctly displays version range (e.g., "2.0.2 → 2.0.3") when an update is available
+
+## Technical Details
+
+### Files Added
+- `CODE_OF_CONDUCT.md` - Community guidelines
+- `CONTRIBUTING.md` - Contributor guidelines
+- `LICENSE` - GPL-3.0 License
+- `CHANGELOG.md` - Version changelog
+- `RELEASE_NOTES.md` - Detailed release notes
+- `fastlane/Fastfile` - Fastlane configuration
+- `fastlane/Appfile` - Fastlane app configuration
+- `fastlane/README.md` - Fastlane documentation
+- `app/src/main/res/values-es/strings.xml` - Spanish translations
+- `app/src/main/res/values-fr/strings.xml` - French translations
+- `app/src/main/res/values-de/strings.xml` - German translations
+- `app/src/main/res/values-ja/strings.xml` - Japanese translations
+- `app/src/main/res/values-zh/strings.xml` - Chinese translations
+
+### Files Modified
+- `app/build.gradle.kts` - Updated version to 2.0.4 (versionCode 6)
+- `changelog.json` - Added v2.0.4 release information
+- `app/src/main/assets/changelog.json` - Added v2.0.4 release information
+
+---
+
 # Otter v2.0.3 - Sync Simplification & UI Improvements
 
 ## Download

@@ -1,0 +1,7 @@
+json_key_file("path/to/api-key.json")
+package_name("com.otter.app")
+upload_to_play_store(
+  track: "internal",
+  aab: false,
+  apk: "app/build/outputs/apk/release/app-release.apk"
+)

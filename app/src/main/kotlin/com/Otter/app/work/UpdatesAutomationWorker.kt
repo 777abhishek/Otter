@@ -29,10 +29,10 @@ class UpdatesAutomationWorker
         }
 
         override suspend fun doWork(): Result {
-            val settings = settingsService.getSettings().first()
-            if (!settings.updatesAutomationEnabled) return Result.success()
+            try {
+                val settings = settingsService.getSettings().first()
+                if (!settings.updatesAutomationEnabled) return Result.success()
 
-            return runCatching {
                 // 1) Otter app update check
                 val latestRelease = withContext(Dispatchers.IO) { AppUpdateUtil.fetchLatestRelease() }
                 if (settings.updatesAutomationNotify && latestRelease != null) {
@@ -74,11 +74,10 @@ class UpdatesAutomationWorker
                     storageService.clearCache()
                 }
 
-                Unit
-            }.fold(
-                onSuccess = { Result.success() },
-                onFailure = { Result.retry() },
-            )
+                return Result.success()
+            } catch (e: Exception) {
+                return Result.retry()
+            }
         }
 
         private fun normalizeVersion(v: String): String {

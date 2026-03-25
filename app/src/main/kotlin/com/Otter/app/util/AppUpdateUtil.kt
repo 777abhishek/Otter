@@ -113,30 +113,91 @@ object AppUpdateUtil {
         onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit,
     ): File? =
         withContext(Dispatchers.IO) {
-            val req = Request.Builder().url(asset.downloadUrl).build()
-            val resp = client.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext null
-
-            val body = resp.body ?: return@withContext null
-            val total = body.contentLength().takeIf { it > 0 } ?: asset.sizeBytes
-
-            val outFile = File(context.cacheDir, "update_${asset.name}")
-            body.byteStream().use { input ->
-                FileOutputStream(outFile).use { output ->
-                    val buf = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var downloaded = 0L
-                    while (true) {
-                        val read = input.read(buf)
-                        if (read <= 0) break
-                        output.write(buf, 0, read)
-                        downloaded += read
-                        onProgress(downloaded, total)
+            try {
+                // Create cache directory if needed
+                val cacheDir = File(context.cacheDir, "app_updates")
+                cacheDir.mkdirs()
+                
+                val outFile = File(cacheDir, "update_${asset.name}")
+                val tmpFile = File(cacheDir, "update_${asset.name}.tmp")
+                
+                // Check if we can resume
+                var startFrom = 0L
+                if (tmpFile.exists()) {
+                    startFrom = tmpFile.length()
+                    if (startFrom >= asset.sizeBytes) {
+                        // Corrupted partial file, restart
+                        tmpFile.delete()
+                        startFrom = 0L
                     }
-                    output.flush()
                 }
+                
+                // Try resumable download with Range header
+                val reqBuilder = Request.Builder().url(asset.downloadUrl)
+                if (startFrom > 0) {
+                    reqBuilder.addHeader("Range", "bytes=$startFrom-")
+                    android.util.Log.d("AppUpdateUtil", "Resuming download from $startFrom bytes")
+                }
+                
+                val req = reqBuilder.build()
+                val resp = client.newCall(req).execute()
+                
+                if (!resp.isSuccessful) {
+                    android.util.Log.e("AppUpdateUtil", "Download failed: ${resp.code} ${resp.message}")
+                    return@withContext null
+                }
+                
+                val body = resp.body ?: return@withContext null
+                
+                // Calculate total size
+                val total = when (resp.code) {
+                    206 -> {
+                        // Partial content (resume successful)
+                        startFrom + (body.contentLength().takeIf { it > 0 } ?: asset.sizeBytes)
+                    }
+                    else -> {
+                        // Full download
+                        body.contentLength().takeIf { it > 0 } ?: asset.sizeBytes
+                    }
+                }
+                
+                // Download to temporary file
+                body.byteStream().use { input ->
+                    FileOutputStream(tmpFile, startFrom > 0).use { output ->
+                        val buf = ByteArray(8192)
+                        var downloaded = startFrom
+                        
+                        while (true) {
+                            val read = input.read(buf)
+                            if (read <= 0) break
+                            
+                            output.write(buf, 0, read)
+                            downloaded += read
+                            onProgress(downloaded, total)
+                        }
+                        output.flush()
+                    }
+                }
+                
+                // Verify file size matches expected
+                if (tmpFile.length() != total) {
+                    android.util.Log.w("AppUpdateUtil", 
+                        "File size mismatch: expected $total, got ${tmpFile.length()}")
+                    tmpFile.delete()
+                    return@withContext null
+                }
+                
+                // Move from temp to final location
+                tmpFile.renameTo(outFile)
+                onProgress(total, total) // Ensure UI shows 100%
+                android.util.Log.d("AppUpdateUtil", "Download complete: ${outFile.absolutePath}")
+                
+                outFile
+            } catch (e: Exception) {
+                android.util.Log.e("AppUpdateUtil", "Download interrupted: ${e.message}")
+                // Keep .tmp file for resume on next attempt
+                null
             }
-
-            outFile
         }
 
     fun buildInstallIntent(context: Context, apkFile: File): Intent {

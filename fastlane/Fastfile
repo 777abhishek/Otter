@@ -1,0 +1,143 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build debug APK"
+  lane :debug do
+    gradle(
+      task: "assemble",
+      build_type: "Debug"
+    )
+  end
+
+  desc "Build release APK"
+  lane :release do
+    gradle(
+      task: "assemble",
+      build_type: "Release"
+    )
+  end
+
+  desc "Deploy a new version to Google Play"
+  lane :playstore do
+    gradle(
+      task: "assemble",
+      build_type: "Release"
+    )
+    upload_to_play_store
+  end
+
+  desc "Deploy a new version to Google Play with rollout"
+  lane :playstore_rollout do
+    gradle(
+      task: "assemble",
+      build_type: "Release"
+    )
+    upload_to_play_store(
+      track: 'rollout',
+      rollout: '0.1'
+    )
+  end
+
+  desc "Run all tests"
+  lane :test do
+    gradle(task: "test")
+  end
+
+  desc "Run unit tests"
+  lane :unit_test do
+    gradle(task: "testDebugUnitTest")
+  end
+
+  desc "Run instrumentation tests"
+  lane :instrumentation_test do
+    gradle(task: "connectedDebugAndroidTest")
+  end
+
+  desc "Build and sign APK"
+  lane :build_signed do
+    gradle(
+      task: "assemble",
+      build_type: "Release",
+      properties: {
+        "android.injected.signing.store.file" => ENV["KEYSTORE_FILE"],
+        "android.injected.signing.store.password" => ENV["KEYSTORE_PASSWORD"],
+        "android.injected.signing.key.alias" => ENV["KEY_ALIAS"],
+        "android.injected.signing.key.password" => ENV["KEY_PASSWORD"]
+      }
+    )
+  end
+
+  desc "Increment version code"
+  lane :bump_version_code do
+    increment_version_code(
+      gradle_file_path: "app/build.gradle.kts"
+    )
+  end
+
+  desc "Increment version name"
+  lane :bump_version_name do
+    increment_version_name(
+      gradle_file_path: "app/build.gradle.kts",
+      bump_type: "patch"
+    )
+  end
+
+  desc "Capture screenshots"
+  lane :screenshots do
+    capture_screenshots(
+      locales: ['en-US']
+    )
+  end
+
+  desc "Upload metadata to Google Play"
+  lane :metadata do
+    upload_to_play_store(
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      metadata_path: "fastlane/metadata/android"
+    )
+  end
+
+  desc "Build all APK variants"
+  lane :build_all do
+    gradle(
+      task: "assemble",
+      build_type: "Release",
+      flavor: "arm64-v8a"
+    )
+    gradle(
+      task: "assemble",
+      build_type: "Release",
+      flavor: "armeabi-v7a"
+    )
+    gradle(
+      task: "assemble",
+      build_type: "Release",
+      flavor: "universal"
+    )
+  end
+
+  desc "Clean build artifacts"
+  lane :clean do
+    gradle(task: "clean")
+  end
+
+  after_all do |lane|
+    slack(
+      message: "Successfully deployed new App Update (#{lane})",
+      success: true,
+      default_payloads: [:git_branch, :git_author],
+      channel: "#deployments"
+    ) if ENV["SLACK_URL"]
+  end
+
+  error do |lane, exception|
+    slack(
+      message: "Error deploying new App Update (#{lane}): #{exception}",
+      success: false,
+      channel: "#deployments"
+    ) if ENV["SLACK_URL"]
+  end
+end

@@ -45,33 +45,35 @@ fun PlaylistCardItem(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(vertical = 0.dp)
-                .heightIn(min = 72.dp)
+                .padding(vertical = 1.dp)
                 .clickable {
                     if (isRearranging) {
                         onLongPress?.invoke()
                     } else {
                         onClick()
                     }
-                },
+                }
+                .heightIn(min = 88.dp),
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(16.dp),
     ) {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 72.dp)
-                    .padding(4.dp),
+                    .heightIn(min = 88.dp)
+                    .padding(5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val thumbShape = RoundedCornerShape(12.dp)
             Box(
                 modifier =
                     Modifier
-                        .size(width = 108.dp, height = 60.dp)
+                        .size(width = 128.dp, height = 72.dp)
                         .clip(thumbShape),
                 contentAlignment = Alignment.Center,
             ) {
@@ -86,43 +88,57 @@ fun PlaylistCardItem(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)),
+                                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.PlaylistPlay,
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(32.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = playlist.title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = MaterialTheme.typography.titleMedium.lineHeight,
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${playlist.videoCount} videos",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.VideoLibrary,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "${playlist.videoCount} videos",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
             if (isRearranging) {
                 Icon(
                     imageVector = Icons.Rounded.DragHandle,
                     contentDescription = "Drag to reorder",
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(26.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
@@ -130,12 +146,12 @@ fun PlaylistCardItem(
                     onClick = {
                         showMenu = true
                     },
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(42.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.MoreVert,
                         contentDescription = "Playlist options",
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

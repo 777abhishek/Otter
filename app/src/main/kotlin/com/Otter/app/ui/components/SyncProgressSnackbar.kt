@@ -16,9 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,7 +82,6 @@ fun SyncProgressSnackbar(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SyncingSnackbar(
     stage: String,
@@ -295,6 +292,12 @@ private fun SuccessSnackbar(
                         color = MaterialTheme.colorScheme.tertiary,
                         strokeWidth = 3.dp,
                         trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                    )
+                    Text(
+                        text = "100%",
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 

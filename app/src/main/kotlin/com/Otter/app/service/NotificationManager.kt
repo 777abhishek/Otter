@@ -66,6 +66,7 @@ class NotificationManager
             const val CHANNEL_ID_SYNC = "sync_channel"
             private const val CHANNEL_NAME_SYNC = "Sync"
             private const val NOTIFICATION_ID_SYNC = 1101
+            private const val NOTIFICATION_ID_METADATA = 1102
 
             const val ACTION_CANCEL = "com.Otter.app.action.CANCEL"
             const val ACTION_RETRY = "com.Otter.app.action.RETRY"
@@ -104,6 +105,7 @@ class NotificationManager
                         }
                         if (!allEnabled || !syncEnabled) {
                             cancelSyncNotification()
+                            cancelMetadataNotification()
                         }
                     }
             }
@@ -301,6 +303,79 @@ class NotificationManager
                     notificationManager.cancel(NOTIFICATION_ID_SYNC)
                 }
             }
+        }
+
+        fun updateMetadataNotification(
+            title: String,
+            text: String,
+            progress: Float? = null,
+            ongoing: Boolean,
+        ) {
+            if (!shouldPostSyncNotifications()) return
+
+            val builder =
+                NotificationCompat.Builder(context, CHANNEL_ID_SYNC)
+                    .setSmallIcon(R.drawable.icon_light)
+                    .setContentTitle(title)
+                    .setContentText(text)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                    .setOngoing(ongoing)
+                    .setOnlyAlertOnce(true)
+
+            if (progress != null) {
+                builder.setProgress(100, (progress.coerceIn(0f, 1f) * 100).toInt(), false)
+            } else if (ongoing) {
+                builder.setProgress(0, 0, true)
+            } else {
+                builder.setProgress(0, 0, false)
+            }
+
+            val contentIntent =
+                PendingIntent.getActivity(
+                    context,
+                    0,
+                    Intent(context, MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+            builder.setContentIntent(contentIntent)
+
+            kotlin.runCatching {
+                notificationManager.notify(NOTIFICATION_ID_METADATA, builder.build())
+            }
+
+            if (!ongoing) {
+                scope.launch {
+                    kotlinx.coroutines.delay(5000)
+                    cancelMetadataNotification()
+                }
+            }
+        }
+
+        fun cancelMetadataNotification() {
+            if (canPostNotifications()) {
+                kotlin.runCatching {
+                    notificationManager.cancel(NOTIFICATION_ID_METADATA)
+                }
+            }
+        }
+
+        fun showPlaylistFullMetadataCompleteNotification(
+            playlistTitle: String,
+            videoCount: Int,
+        ) {
+            if (!canPostNotifications() || !syncNotificationsEnabled) return
+
+            val notification =
+                NotificationCompat.Builder(context, CHANNEL_ID_SYNC)
+                    .setSmallIcon(R.drawable.icon_light)
+                    .setContentTitle("Enhanced metadata synced")
+                    .setContentText("$playlistTitle: $videoCount videos updated")
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setAutoCancel(true)
+                    .setCategory(NotificationCompat.CATEGORY_STATUS)
+                    .build()
+
+            notificationManager.notify(NOTIFICATION_ID_SYNC + 1001, notification)
         }
 
         /**

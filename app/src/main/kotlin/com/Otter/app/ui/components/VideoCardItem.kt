@@ -59,7 +59,7 @@ fun VideoCardItem(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp, horizontal = 0.dp)
+                .padding(vertical = 1.dp)
                 .heightIn(min = 100.dp)
                 .clickable {
                     if (isSelectionMode) {

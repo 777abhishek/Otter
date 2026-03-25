@@ -9,6 +9,9 @@ import com.Otter.app.data.repositories.VideoRepository
 import com.Otter.app.data.ytdlp.YtDlpManager
 import com.Otter.app.service.NotificationManager
 import com.Otter.app.util.FileLogger
+import com.Otter.app.work.PlaylistFullMetadataWorkScheduler
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,10 +20,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -33,6 +37,7 @@ import javax.inject.Singleton
 class SubscriptionSyncService
     @Inject
     constructor(
+        @ApplicationContext private val context: Context,
         private val ytDlpManager: YtDlpManager,
         private val cookieAuthStore: CookieAuthStore,
         private val playlistRepository: PlaylistRepository,
@@ -141,6 +146,59 @@ class SubscriptionSyncService
             return job.await()
         }
 
+        /**
+         * Sync a single playlist with exponential backoff retry (max 3 attempts)
+         * Handles rate limiting and network errors gracefully
+         * Delays between requests: 1s, 2s, 4s
+         */
+        private suspend fun syncPlaylistWithRetry(
+            playlist: Playlist,
+            cookiesFilePath: String?,
+            attempt: Int = 1,
+            maxAttempts: Int = 3,
+        ): List<com.Otter.app.data.models.Video>? {
+            return try {
+                // Add exponential delay between retries (first request: 0.5s, retries: 1s, 2s)
+                val delayMs = if (attempt == 1) 500L else (1000L shl (attempt - 2))
+                kotlinx.coroutines.delay(delayMs)
+
+                ytDlpManager.extractPlaylistVideos(
+                    playlistId = playlist.id,
+                    cookiesFilePath = cookiesFilePath,
+                ).getOrNull()
+            } catch (e: Exception) {
+                val errorMsg = e.message ?: "Unknown error"
+                when {
+                    // Rate limiting - wait longer and retry
+                    errorMsg.contains("429", ignoreCase = true) || errorMsg.contains("too many", ignoreCase = true) -> {
+                        if (attempt < maxAttempts) {
+                            fileLogger.log(TAG, "Playlist ${playlist.id}: Rate limited (429), retry attempt $attempt/${maxAttempts}")
+                            kotlinx.coroutines.delay(5000L * (attempt))  // 5s, 10s, 15s for rate limits
+                            syncPlaylistWithRetry(playlist, cookiesFilePath, attempt + 1, maxAttempts)
+                        } else {
+                            fileLogger.logError(TAG, "Playlist ${playlist.id}: Rate limited - max retries exceeded", e)
+                            null
+                        }
+                    }
+                    // Network timeout - retry with backoff
+                    errorMsg.contains("timeout", ignoreCase = true) || errorMsg.contains("connection", ignoreCase = true) -> {
+                        if (attempt < maxAttempts) {
+                            fileLogger.log(TAG, "Playlist ${playlist.id}: Network error, retry attempt $attempt/${maxAttempts}")
+                            syncPlaylistWithRetry(playlist, cookiesFilePath, attempt + 1, maxAttempts)
+                        } else {
+                            fileLogger.logError(TAG, "Playlist ${playlist.id}: Network error - max retries exceeded", e)
+                            null
+                        }
+                    }
+                    // Other errors - don't retry
+                    else -> {
+                        fileLogger.logError(TAG, "Playlist ${playlist.id}: Sync error (attempt $attempt/$maxAttempts)", e)
+                        null
+                    }
+                }
+            }
+        }
+
         fun cancelOngoingSync() {
             val jobsToCancel =
                 synchronized(activeJobsLock) {
@@ -192,40 +250,46 @@ class SubscriptionSyncService
                         ),
                     )
 
-                    val semaphore = Semaphore(6)
+                    // Reduced to 2 concurrent requests to avoid rate limiting
+                    // YouTube blocks aggressive multi-threaded access
+                    val semaphore = Semaphore(2)
                     val completed = AtomicInteger(0)
+                    val failed = mutableListOf<String>()
 
                     val playlistsWithVideos =
                         coroutineScope {
                             playlists.map { playlist ->
                                 async {
                                     semaphore.withPermit {
-                                        val videos =
-                                            ytDlpManager.extractPlaylistVideos(
-                                                playlistId = playlist.id,
-                                                cookiesFilePath = cookiesFilePath,
-                                            ).getOrNull().orEmpty()
+                                        val result = syncPlaylistWithRetry(playlist, cookiesFilePath)
 
-                                        if (videos.isNotEmpty()) {
+                                        if (result != null) {
                                             playlistRepository.upsertPlaylistWithVideos(
-                                                playlist = playlist.copy(videoCount = videos.size, videos = emptyList()),
-                                                videos = videos,
+                                                playlist = playlist.copy(videoCount = result.size, videos = emptyList()),
+                                                videos = result,
                                             )
+                                            fileLogger.log(TAG, "Synced playlist: ${playlist.id} → ${result.size} videos")
+                                        } else {
+                                            failed.add(playlist.id)
                                         }
 
                                         val done = completed.incrementAndGet()
                                         setSyncState(
                                             SyncState.Syncing(
-                                                stage = "Fetched $done/${playlists.size} playlists",
+                                                stage = "Fetched $done/${playlists.size} playlists (${failed.size} retries)",
                                                 progress = (0.05f + (0.85f * (done.toFloat() / playlists.size.toFloat()))).coerceIn(0f, 0.99f),
                                             ),
                                         )
 
-                                        playlist.copy(videos = videos)
+                                        playlist.copy(videos = result ?: emptyList())
                                     }
                                 }
                             }.awaitAll()
                         }
+                    
+                    if (failed.isNotEmpty()) {
+                        fileLogger.logError(TAG, "${failed.size} playlists failed to sync: ${failed.joinToString(", ")}", null)
+                    }
 
                     val watchLaterCount =
                         playlistsWithVideos.firstOrNull { it.id == SPECIAL_PLAYLIST_WATCH_LATER }?.videos?.size ?: 0
@@ -245,6 +309,23 @@ class SubscriptionSyncService
 
                     val duration = System.currentTimeMillis() - startTime
                     fileLogger.log(TAG, "Sync all completed in ${duration}ms: playlists=${playlists.size} videos=$totalVideos")
+
+                    // Stage 2: Schedule metadata enrichment in background for all synced playlists
+                    syncScope.launch(Dispatchers.IO) {
+                        playlistsWithVideos
+                            .asSequence()
+                            .filter { it.videos.isNotEmpty() }
+                            .forEach { playlist ->
+                                try {
+                                    if (playlist.id.isNotBlank() && playlist.id != "playlists" && playlist.id.length >= 2) {
+                                        PlaylistFullMetadataWorkScheduler.enqueueFullMetadataSync(context, playlist.id)
+                                        fileLogger.log(TAG, "Scheduled Stage 2 metadata enrichment for playlist: ${playlist.id}")
+                                    }
+                                } catch (e: Exception) {
+                                    fileLogger.logError(TAG, "Failed to schedule Stage 2 for playlist ${playlist.id}", e)
+                                }
+                        }
+                    }
 
                     Result.success(result)
                 } catch (e: Exception) {
@@ -309,6 +390,16 @@ class SubscriptionSyncService
                     val duration = System.currentTimeMillis() - startTime
                     fileLogger.log(TAG, "Playlist sync completed: id=$playlistId videos=${flatVideos.size} in ${duration}ms")
 
+                    // Stage 2: Schedule metadata enrichment in background for this playlist
+                    syncScope.launch(Dispatchers.IO) {
+                        try {
+                            PlaylistFullMetadataWorkScheduler.enqueueFullMetadataSync(context, playlistId)
+                            fileLogger.log(TAG, "Scheduled Stage 2 metadata enrichment for playlist: $playlistId")
+                        } catch (e: Exception) {
+                            fileLogger.logError(TAG, "Failed to schedule Stage 2 for playlist $playlistId", e)
+                        }
+                    }
+
                     Result.success(result)
                 } catch (e: Exception) {
                     fileLogger.logError(TAG, "Playlist sync failed: id=$playlistId", e)
@@ -367,6 +458,16 @@ class SubscriptionSyncService
 
                     val duration = System.currentTimeMillis() - startTime
                     fileLogger.log(TAG, "Playlist sync completed: id=$playlistId videos=${flatVideos.size} in ${duration}ms")
+
+                    // Stage 2: Schedule metadata enrichment in background for this playlist
+                    syncScope.launch(Dispatchers.IO) {
+                        try {
+                            PlaylistFullMetadataWorkScheduler.enqueueFullMetadataSync(context, playlistId)
+                            fileLogger.log(TAG, "Scheduled Stage 2 metadata enrichment for playlist: $playlistId")
+                        } catch (e: Exception) {
+                            fileLogger.logError(TAG, "Failed to schedule Stage 2 for playlist $playlistId", e)
+                        }
+                    }
 
                     Result.success(result)
                 } catch (e: Exception) {

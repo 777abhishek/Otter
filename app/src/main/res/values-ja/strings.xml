@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="suggested">おすすめ</string>
+    <string name="audio">オーディオ</string>
+    <string name="video_only">ビデオのみ</string>
+    <string name="subtitle_language">字幕の言語</string>
+    <string name="subtitle_suggested">おすすめ字幕</string>
+    <string name="auto_translated_captions">自動翻訳キャプション</string>
+    <string name="update_sub_language_msg">更新する字幕言語を選択してください</string>
+    <string name="rename">名前を変更</string>
+    <string name="title">タイトル</string>
+    <string name="confirm">確認</string>
+    <string name="dismiss">閉じる</string>
+    <string name="clear">クリア</string>
+    <string name="close">閉じる</string>
+    <string name="start_download">ダウンロードを開始</string>
+    <string name="ytdlp_update">yt-dlpを更新</string>
+</resources>

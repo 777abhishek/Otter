@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="suggested">Vorgeschlagen</string>
+    <string name="audio">Audio</string>
+    <string name="video_only">Nur Video</string>
+    <string name="subtitle_language">Untertitelsprache</string>
+    <string name="subtitle_suggested">Vorgeschlagene Untertitel</string>
+    <string name="auto_translated_captions">Automatisch übersetzte Untertitel</string>
+    <string name="update_sub_language_msg">Wählen Sie Untertitelsprachen zum Aktualisieren aus</string>
+    <string name="rename">Umbenennen</string>
+    <string name="title">Titel</string>
+    <string name="confirm">Bestätigen</string>
+    <string name="dismiss">Verwerfen</string>
+    <string name="clear">Löschen</string>
+    <string name="close">Schließen</string>
+    <string name="start_download">Download starten</string>
+    <string name="ytdlp_update">yt-dlp aktualisieren</string>
+</resources>

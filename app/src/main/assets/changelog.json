@@ -1,6 +1,54 @@
 {
   "releases": [
     {
+      "version": "2.0.4",
+      "versionCode": 6,
+      "date": "2026-03-26",
+      "type": "patch",
+      "highlights": [
+        "GitHub best practices and community guidelines",
+        "Multi-language support infrastructure",
+        "Fastlane automated release pipeline",
+        "Improved UI spacing and error handling"
+      ],
+      "categories": {
+        "improvements": [
+          {
+            "title": "GitHub best practices",
+            "description": "Added Code of Conduct, Contributing guidelines, and GPL-3.0 License for better community collaboration",
+            "impact": "high"
+          },
+          {
+            "title": "Multi-language support",
+            "description": "Added string resources for Spanish, French, German, Japanese, and Chinese languages",
+            "impact": "medium"
+          },
+          {
+            "title": "Fastlane automation",
+            "description": "Set up Fastlane for automated release deployment to Google Play Store",
+            "impact": "medium"
+          },
+          {
+            "title": "UI spacing improvements",
+            "description": "Reduced vertical spacing between video and playlist cards for better visual compactness",
+            "impact": "low"
+          },
+          {
+            "title": "Better error handling",
+            "description": "Enhanced error handling with user-visible notifications",
+            "impact": "medium"
+          }
+        ],
+        "fixes": [
+          {
+            "title": "Update Checker version display",
+            "description": "Fixed Update Checker screen to correctly display version range (e.g., '2.0.2 → 2.0.3') when an update is available",
+            "impact": "medium"
+          }
+        ]
+      }
+    },
+    {
       "version": "2.0.3",
       "versionCode": 5,
       "date": "2026-03-25",
