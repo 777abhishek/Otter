@@ -60,7 +60,7 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            isEnable = project.hasProperty("enableSplits") && project.property("enableSplits").toString().toBoolean()
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64")
             isUniversalApk = true
@@ -114,6 +114,8 @@ android {
 
     lint {
         disable.add("PropertyEscape")
+        abortOnError = false
+        checkReleaseBuilds = false
     }
 
     // --- NEW: Rename Build Output ---

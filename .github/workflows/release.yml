@@ -54,7 +54,7 @@ jobs:
           EOF
 
       - name: Build release APK
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew assembleRelease -PenableSplits=true --stacktrace
         env:
           Otter_BACKEND_BASE_URL: ${{ secrets.OTTER_BACKEND_BASE_URL || '' }}
           Otter_APP_API_KEY: ${{ secrets.OTTER_APP_API_KEY || '' }}
