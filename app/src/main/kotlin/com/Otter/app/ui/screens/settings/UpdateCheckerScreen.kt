@@ -494,11 +494,20 @@ private fun formatReleaseNotes(body: String): String {
         .trim()
 }
 
-private fun normalizeVersion(v: String): String = v.trim().removePrefix("v").removePrefix("V")
+private fun normalizeVersion(v: String): String {
+    // Remove 'v' prefix, platform suffix, and any extra whitespace
+    return v.trim()
+        .removePrefix("v")
+        .removePrefix("V")
+        .split("-")[0] // Remove platform suffix like -github, -fdroid
+}
 
 private fun compareVersions(a: String, b: String): Int {
-    val pa = a.split(".").map { it.toIntOrNull() ?: 0 }
-    val pb = b.split(".").map { it.toIntOrNull() ?: 0 }
+    // Normalize both versions first to remove any platform suffixes
+    val normalizedA = normalizeVersion(a)
+    val normalizedB = normalizeVersion(b)
+    val pa = normalizedA.split(".").map { it.toIntOrNull() ?: 0 }
+    val pb = normalizedB.split(".").map { it.toIntOrNull() ?: 0 }
     for (i in 0 until maxOf(pa.size, pb.size)) {
         val diff = (pa.getOrElse(i) { 0 }).compareTo(pb.getOrElse(i) { 0 })
         if (diff != 0) return diff

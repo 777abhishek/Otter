@@ -223,6 +223,57 @@ fun AboutSettings(
             )
         )
 
+        // Legal Section
+        Text(
+            text = "Legal",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+        )
+
+        Material3ExpressiveSettingsGroup(
+            modifier = Modifier.fillMaxWidth(),
+            items = listOf(
+                {
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.Policy, null, modifier = Modifier.size(22.dp)) },
+                        title = "Privacy Policy",
+                        subtitle = "How we handle your data",
+                        onClick = { navController.navigate("privacyPolicy") },
+                        showArrow = true,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
+                    )
+                },
+                {
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.Gavel, null, modifier = Modifier.size(22.dp)) },
+                        title = "Fair Use & Disclaimer",
+                        subtitle = "Legal information about content",
+                        onClick = { navController.navigate("fairUsePolicy") },
+                        showArrow = true,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
+                    )
+                },
+                {
+                    ModernInfoItem(
+                        icon = { Icon(Icons.Rounded.Info, null, modifier = Modifier.size(22.dp)) },
+                        title = "Third-Party Licenses",
+                        subtitle = "Open source libraries we use",
+                        onClick = { navController.navigate("thirdPartyLicenses") },
+                        showArrow = true,
+                        iconBackgroundColor = iconBgColor,
+                        iconContentColor = iconStyleColor,
+                        iconShape = settings.iconShape,
+                    )
+                }
+            )
+        )
+
         // Features Section
         Text(
             text = "Features",

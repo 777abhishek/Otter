@@ -53,6 +53,14 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.SyncNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.Otter.app.action.SYNC_CANCEL" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".service.DownloadForegroundService"
             android:exported="false"

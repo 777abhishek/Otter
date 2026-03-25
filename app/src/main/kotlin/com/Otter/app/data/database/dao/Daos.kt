@@ -29,6 +29,11 @@ interface VideoDao {
     )
     suspend fun getVideoFlagsByPlaylistOnce(playlistId: String): List<VideoFlagsProjection>
 
+    @Query(
+        "SELECT id, isDownloaded, filePath, isLiked, isWatchLater, addedDate FROM videos WHERE id = :videoId LIMIT 1",
+    )
+    suspend fun getVideoFlagsById(videoId: String): VideoFlagsProjection?
+
     @Query("SELECT * FROM videos WHERE playlistId = 'LL' ORDER BY position ASC")
     fun getLikedVideos(): Flow<List<VideoEntity>>
 

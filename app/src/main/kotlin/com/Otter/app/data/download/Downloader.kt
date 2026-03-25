@@ -21,6 +21,7 @@ interface Downloader {
                 state.downloadState == Task.DownloadState.ReadyWithInfo
             }
             .map { it.key }
+            .toList() // Create a copy to avoid ConcurrentModificationException
         var count = 0
         tasks.forEach { if (cancel(it)) count++ }
         return count

@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.Otter.app.data.download.ARIA2C
 import com.Otter.app.data.download.AUTO_SUBTITLE
 import com.Otter.app.data.download.AUTO_TRANSLATED_SUBTITLES
 import com.Otter.app.data.download.AV1_HARDWARE_ACCELERATED
@@ -95,7 +94,6 @@ fun DownloadSettings(
     val iconStyleColor = MaterialTheme.colorScheme.onPrimaryContainer
 
     var cookiesEnabled by remember { mutableStateOf(COOKIES.getBoolean()) }
-    var aria2cEnabled by remember { mutableStateOf(ARIA2C.getBoolean()) }
     var restrictFilenamesEnabled by remember { mutableStateOf(RESTRICT_FILENAMES.getBoolean()) }
     var archiveEnabled by remember { mutableStateOf(DOWNLOAD_ARCHIVE.getBoolean()) }
     var embedMetadataEnabled by remember { mutableStateOf(EMBED_METADATA.getBoolean()) }
@@ -388,31 +386,6 @@ fun DownloadSettings(
                                     onCheckedChange = {
                                         cookiesEnabled = it
                                         COOKIES.updateBoolean(it)
-                                    },
-                                    modifier = Modifier.padding(end = 20.dp),
-                                )
-                            }
-                        },
-                        {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    ModernInfoItem(
-                                        icon = { Icon(Icons.Rounded.Extension, null, modifier = Modifier.size(22.dp)) },
-                                        title = "Use aria2",
-                                        subtitle = "Segmented downloads for speed",
-                                        iconBackgroundColor = iconBgColor,
-                                        iconContentColor = iconStyleColor,
-                                        iconShape = settings.iconShape,
-                                    )
-                                }
-                                Switch(
-                                    checked = aria2cEnabled,
-                                    onCheckedChange = {
-                                        aria2cEnabled = it
-                                        ARIA2C.updateBoolean(it)
                                     },
                                     modifier = Modifier.padding(end = 20.dp),
                                 )

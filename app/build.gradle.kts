@@ -30,8 +30,8 @@ android {
         applicationId = "com.Otter.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
-        versionName = "2.0.2"
+        versionCode = 5
+        versionName = "2.0.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 
@@ -45,29 +45,6 @@ android {
             (project.findProperty("Otter_APP_API_KEY") as? String)
                 ?: System.getenv("Otter_APP_API_KEY")
         buildConfigField("String", "Otter_APP_API_KEY", "\"${otterApiKey ?: ""}\"")
-
-        buildConfigField("Boolean", "FDROID_BUILD", "false")
-        buildConfigField("Boolean", "PLAY_BUILD", "false")
-        buildConfigField("Boolean", "GITHUB_BUILD", "false")
-    }
-
-    flavorDimensions += "distribution"
-    productFlavors {
-        create("fdroid") {
-            dimension = "distribution"
-            applicationIdSuffix = ".fdroid"
-            versionNameSuffix = "-fdroid"
-            buildConfigField("Boolean", "FDROID_BUILD", "true")
-        }
-        create("github") {
-            dimension = "distribution"
-            versionNameSuffix = "-github"
-            buildConfigField("Boolean", "GITHUB_BUILD", "true")
-        }
-        create("play") {
-            dimension = "distribution"
-            buildConfigField("Boolean", "PLAY_BUILD", "true")
-        }
     }
 
     signingConfigs {
@@ -120,6 +97,7 @@ android {
         freeCompilerArgs +=
             listOf(
                 "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+                "-Xannotation-default-target=param-property",
             )
     }
 
@@ -143,8 +121,7 @@ android {
         outputs.all {
             val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val abi = output?.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
-            val flavor = flavorName.takeIf { it.isNotBlank() } ?: "noflavor"
-            output?.outputFileName = "Otter-$flavor-$abi-${buildType.name}.apk"
+            output?.outputFileName = "Otter-$abi-${buildType.name}.apk"
         }
     }
 }
@@ -224,7 +201,6 @@ dependencies {
     // 3rd Party
     implementation("io.github.junkfood02.youtubedl-android:library:0.17.3")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.3")
-    implementation("io.github.junkfood02.youtubedl-android:aria2c:0.17.3")
     implementation("com.github.teamnewpipe:NewPipeExtractor:v0.25.2")
     implementation("com.google.android.material:material:1.13.0-alpha06")
 

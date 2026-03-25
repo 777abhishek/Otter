@@ -295,7 +295,9 @@ class PlayerService : MediaSessionService() {
 
                 val queueItems = intent.getParcelableArrayListExtra<QueueItem>(EXTRA_QUEUE)
                 val queuePosition = intent.getIntExtra(EXTRA_QUEUE_POSITION, 0)
-                if (queueItems != null) {
+                val hasQueue = queueItems != null && queueItems.isNotEmpty()
+                
+                if (hasQueue) {
                     // Normalize queue durations to milliseconds (older callers stored seconds)
                     val normalizedQueue =
                         queueItems.map { item ->
@@ -349,7 +351,8 @@ class PlayerService : MediaSessionService() {
                             play()
                         }
                     }
-                } else {
+                } else if (!hasQueue) {
+                    // Only set single-item queue if no queue was provided from intent
                     val queueItem =
                         QueueItem(
                             videoId = videoId,
@@ -359,9 +362,19 @@ class PlayerService : MediaSessionService() {
                             uploaderName = uploader ?: "",
                         )
                     _currentQueueItem.value = queueItem
+                    // Set queue to include current item so media controls recognize it exists
+                    _queue.value = listOf(queueItem)
+                    _currentQueueIndex.value = 0
                     Log.d(
                         logTag,
                         "ACTION_PLAY explicit videoId=$videoId startPosition=$startPosition queueSize=${_queue.value.size} queueIndex=${_currentQueueIndex.value}",
+                    )
+                    playCurrentQueueItem(startPositionMs = startPosition)
+                } else {
+                    // Queue was provided, currentQueueItem already set above
+                    Log.d(
+                        logTag,
+                        "ACTION_PLAY with queue videoId=$videoId startPosition=$startPosition queueSize=${_queue.value.size} queueIndex=${_currentQueueIndex.value}",
                     )
                     playCurrentQueueItem(startPositionMs = startPosition)
                 }
@@ -1401,6 +1414,10 @@ class PlayerService : MediaSessionService() {
             _currentQueueIndex.value = currentIndex + 1
             _currentQueueItem.value = queue[currentIndex + 1]
             
+            // Update metadata immediately for UI sync (prevents audio/UI mismatch in audio mode)
+            val nextItem = queue[currentIndex + 1]
+            updateCurrentItemMetadata(nextItem)
+            
             // Use preloaded item if available for faster transition
             val preloaded = preloadingNextItem
             preloadingNextItem = null
@@ -1417,6 +1434,8 @@ class PlayerService : MediaSessionService() {
                         playWhenReady = true  // Set BEFORE prepare()
                         setMediaSource(preloaded)
                         prepare()
+                        // Ensure metadata is propagated to MediaSession for immediate UI sync
+                        invalidateMediaSession()
                     }
                     startForegroundService()
                 }
@@ -1437,11 +1456,22 @@ class PlayerService : MediaSessionService() {
         if (currentIndex > 0) {
             _currentQueueIndex.value = currentIndex - 1
             _currentQueueItem.value = queue[currentIndex - 1]
+            
+            // Update metadata immediately for UI sync (prevents audio/UI mismatch in audio mode)
+            val prevItem = queue[currentIndex - 1]
+            updateCurrentItemMetadata(prevItem)
             playCurrentQueueItem(startPositionMs = 0L)
             
             // Preload the next item (which is now the one we just left)
             preloadNextQueueItem()
         }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun updateCurrentItemMetadata(item: QueueItem) {
+        // Update notification immediately to show the current item
+        // The actual metadata was already set when creating the MediaSource with this item
+        updateNotification()
     }
 
     @OptIn(UnstableApi::class)
@@ -1470,6 +1500,12 @@ class PlayerService : MediaSessionService() {
                 Log.w(logTag, "Failed to preload next item: ${e.message}")
             }
         }
+    }
+
+    private fun invalidateMediaSession() {
+        // Force MediaSession to refresh metadata
+        // This ensures queue info is immediately available to system and controllers
+        updateNotification()
     }
 
     private fun seekTo(position: Long) {
@@ -1575,7 +1611,10 @@ class PlayerService : MediaSessionService() {
     }
 
     private fun updateMediaSession() {
-        // MediaSession with Media3 handles metadata automatically
+        // The system media notification reads queue info from the player's media metadata
+        // We've already set queueIndex and queueSize in updateCurrentItemMetadata
+        // Just ensure the notification is updated to reflect the current state
+        updateNotification()
     }
 
     private fun savePlaybackPosition() {

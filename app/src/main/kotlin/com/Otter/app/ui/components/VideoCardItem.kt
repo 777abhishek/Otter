@@ -2,6 +2,9 @@ package com.Otter.app.ui.components
 
 import android.content.Intent
 import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +37,9 @@ fun VideoCardItem(
     onDownload: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     onPlayAsAudio: (() -> Unit)? = null,
+    onLike: (() -> Unit)? = null,
+    onWatchLater: (() -> Unit)? = null,
+    onAddToPlaylist: (() -> Unit)? = null,
     aiEnabled: Boolean = false,
 ) {
     var showMenu by rememberSaveable { mutableStateOf(false) }
@@ -53,8 +59,8 @@ fun VideoCardItem(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(vertical = 0.dp)
-                .heightIn(min = 92.dp)
+                .padding(vertical = 6.dp, horizontal = 0.dp)
+                .heightIn(min = 100.dp)
                 .clickable {
                     if (isSelectionMode) {
                         onSelect?.invoke(!isSelected)
@@ -62,6 +68,8 @@ fun VideoCardItem(
                         onClick()
                     }
                 },
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp, hoveredElevation = 1.dp),
         colors =
             CardDefaults.cardColors(
                 containerColor = cardColor,
@@ -71,16 +79,16 @@ fun VideoCardItem(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 92.dp)
-                    .padding(4.dp),
+                    .heightIn(min = 100.dp)
+                    .padding(5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val thumbShape = RoundedCornerShape(12.dp)
             Box(
                 modifier =
                     Modifier
-                        .width(140.dp)
-                        .aspectRatio(16f / 9f)
+                        .width(160.dp)
+                        .height(90.dp)
                         .clip(thumbShape),
                 contentAlignment = Alignment.Center,
             ) {
@@ -98,7 +106,7 @@ fun VideoCardItem(
                         Icon(
                             imageVector = Icons.Rounded.PlayArrow,
                             contentDescription = null,
-                            modifier = Modifier.size(26.dp),
+                            modifier = Modifier.size(32.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -110,87 +118,134 @@ fun VideoCardItem(
                             Modifier
                                 .align(Alignment.BottomEnd)
                                 .padding(6.dp),
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color.Black.copy(alpha = 0.85f),
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color.Black.copy(alpha = 0.75f),
                     ) {
                         Text(
                             text = formatDurationTimestamp(video.duration),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column(
                 modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = video.title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    lineHeight = MaterialTheme.typography.titleSmall.lineHeight,
                 )
+
                 if (video.channelName.isNotEmpty()) {
-                    Text(
-                        text = video.channelName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Row(
-                    modifier = Modifier.padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (video.views > 0) {
-                        Text(
-                            text = formatViews(video.views),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AccountCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = "•",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (video.uploadDate.isNotEmpty()) {
-                        Text(
-                            text = video.uploadDate,
-                            style = MaterialTheme.typography.labelSmall,
+                            text = video.channelName,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            fontWeight = FontWeight.Normal,
                         )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (video.views > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Visibility,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = formatViews(video.views),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+
+                    if (video.views > 0 && video.uploadDate.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            modifier = Modifier.size(3.dp)
+                        ) {}
+                    }
+
+                    if (video.uploadDate.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = formatUploadDate(video.uploadDate),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(6.dp))
 
             if (isSelectionMode) {
                 Checkbox(
                     checked = isSelected,
                     onCheckedChange = onSelect,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(26.dp),
                 )
             } else {
                 IconButton(
                     onClick = {
                         showMenu = true
                     },
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.MoreVert,
                         contentDescription = "More options",
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -243,15 +298,27 @@ fun VideoCardItem(
             },
             onLike = {
                 dismissMenuSheet()
-                Toast.makeText(context, "Liked: ${video.title}", Toast.LENGTH_SHORT).show()
+                if (onLike != null) {
+                    onLike()
+                } else {
+                    Toast.makeText(context, "Like not available here", Toast.LENGTH_SHORT).show()
+                }
             },
             onWatchLater = {
                 dismissMenuSheet()
-                Toast.makeText(context, "Added to Watch Later: ${video.title}", Toast.LENGTH_SHORT).show()
+                if (onWatchLater != null) {
+                    onWatchLater()
+                } else {
+                    Toast.makeText(context, "Watch Later not available here", Toast.LENGTH_SHORT).show()
+                }
             },
             onAddToPlaylist = {
                 dismissMenuSheet()
-                Toast.makeText(context, "Added to Playlist: ${video.title}", Toast.LENGTH_SHORT).show()
+                if (onAddToPlaylist != null) {
+                    onAddToPlaylist()
+                } else {
+                    Toast.makeText(context, "Add to Playlist not available here", Toast.LENGTH_SHORT).show()
+                }
             },
             onVideoInfo = {
                 dismissMenuSheet()
@@ -498,6 +565,34 @@ private fun formatViews(views: Long): String {
         views >= 1_000_000 -> String.format("%.1fM", views / 1_000_000.0)
         views >= 1_000 -> String.format("%.1fK", views / 1_000.0)
         else -> views.toString()
+    }
+}
+
+private fun formatUploadDate(dateStr: String): String {
+    if (dateStr.isBlank()) return ""
+    
+    return try {
+        // yt-dlp returns date in YYYYMMDD format
+        if (dateStr.matches(Regex("\\d{8}"))) {
+            val inputFormat = SimpleDateFormat("yyyyMMdd", Locale.US)
+            val date = inputFormat.parse(dateStr) ?: return dateStr
+            val now = Date()
+            val diffMs = now.time - date.time
+            val diffDays = diffMs / (1000 * 60 * 60 * 24)
+            
+            when {
+                diffDays < 1 -> "Today"
+                diffDays < 7 -> "$diffDays days ago"
+                diffDays < 30 -> "${diffDays / 7} weeks ago"
+                diffDays < 365 -> "${diffDays / 30} months ago"
+                else -> "${diffDays / 365} years ago"
+            }
+        } else {
+            // Already formatted or different format, return as-is
+            dateStr
+        }
+    } catch (_: Exception) {
+        dateStr
     }
 }
 

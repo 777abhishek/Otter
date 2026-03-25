@@ -59,6 +59,7 @@ fun PlaylistDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val syncState by syncViewModel.syncState.collectAsState()
+    val isRefreshing by syncViewModel.isRefreshing.collectAsState()
 
     val playerViewModel: PlayerViewModel = hiltViewModel()
 
@@ -199,7 +200,7 @@ fun PlaylistDetailScreen(
                 }
                 else -> {
                     PullToRefreshBox(
-                        isRefreshing = false,
+                        isRefreshing = isRefreshing && !isSyncing,
                         onRefresh = {
                             when (playlistId.uppercase()) {
                                 "WL" -> syncViewModel.syncWatchLaterVideos()
@@ -326,6 +327,20 @@ fun PlaylistDetailScreen(
                                                 queue = videos.map { it.toQueueItem() },
                                                 queuePosition = index,
                                             )
+                                        },
+                                        onLike = {
+                                            if (video.isLiked) {
+                                                viewModel.unlikeVideo(video.id)
+                                            } else {
+                                                viewModel.likeVideo(video.id)
+                                            }
+                                        },
+                                        onWatchLater = {
+                                            if (video.isWatchLater) {
+                                                viewModel.removeFromWatchLater(video.id)
+                                            } else {
+                                                viewModel.addToWatchLater(video.id)
+                                            }
                                         },
                                     )
                                 }
@@ -543,12 +558,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.PlaylistActionsSectio
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text =
-                                if (playlistId.equals("WL", ignoreCase = true) || playlistId.equals("LL", ignoreCase = true)) {
-                                    "Download"
-                                } else {
-                                    "Download All "
-                                },
+                            text = "Download",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )

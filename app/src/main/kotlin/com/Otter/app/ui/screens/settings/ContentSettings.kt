@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.Otter.app.data.download.ARIA2C
 import com.Otter.app.data.download.PROXY
 import com.Otter.app.data.download.PROXY_URL
 import com.Otter.app.data.models.PreferredCodec
@@ -83,7 +82,6 @@ fun ContentSettings(
     var showProxyDialog by remember { mutableStateOf(false) }
     var proxyEnabled by remember { mutableStateOf(PROXY.getBoolean()) }
     var proxyUrlDraft by remember { mutableStateOf(PROXY_URL.getString()) }
-    var aria2cEnabled by remember { mutableStateOf(ARIA2C.getBoolean()) }
     var countrySearchQuery by remember { mutableStateOf("") }
 
     // Streaming settings state
@@ -436,33 +434,6 @@ fun ContentSettings(
                                 iconContentColor = iconStyleColor,
                                 iconShape = settings.iconShape,
                             )
-                        },
-                        {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        ModernInfoItem(
-                                            icon = { Icon(Icons.Rounded.Speed, null, modifier = Modifier.size(22.dp)) },
-                                            title = "Use aria2 (faster downloads)",
-                                            subtitle = "Enable segmented downloads for better speed",
-                                            iconBackgroundColor = iconBgColor,
-                                            iconContentColor = iconStyleColor,
-                                            iconShape = settings.iconShape,
-                                        )
-                                    }
-                                    Switch(
-                                        checked = aria2cEnabled,
-                                        onCheckedChange = {
-                                            aria2cEnabled = it
-                                            ARIA2C.updateBoolean(it)
-                                        },
-                                        modifier = Modifier.padding(end = 20.dp),
-                                    )
-                                }
-                            }
                         },
                         {
                             Column(modifier = Modifier.fillMaxWidth()) {

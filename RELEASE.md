@@ -1,3 +1,49 @@
+# Otter v2.0.3 - Sync Simplification & UI Improvements
+
+## Download
+[Download APK](../../releases/download/v2.0.3/app-release.apk)
+
+## Overview
+This release focuses on faster, more reliable playlist syncing using a flat sync approach, plus a redesigned video card with improved metadata layout.
+
+## Key Changes
+
+### Sync Simplification
+- **Fast flat playlist sync**: Playlist syncing is optimized for speed and reliability
+- **More predictable UX**: Sync completes quickly and avoids long-running enrichment attempts
+
+### UI Enhancements
+- **Redesigned video cards**:
+  - Larger thumbnails (160dp × 90dp)
+  - Added icons for channel name, views, and upload date
+  - Better spacing and typography
+  - More responsive layout
+
+### Playlist Detail Improvements
+- Like / Watch Later actions are available directly from the playlist detail video cards
+- Pull-to-refresh spinner behavior is improved to avoid conflicting with sync UI
+
+### New Policy Screens
+- Added Privacy Policy screen in Settings
+- Added Third Party Licenses screen in Settings
+- Added Fair Use Policy screen in Settings
+
+### Technical Improvements
+- Added `--ignore-config` and `--skip-download` to yt-dlp metadata extraction
+- Prevents "Requested format is not available" errors
+
+## Technical Details
+
+### Files Modified
+- `app/src/main/kotlin/com/Otter/app/data/sync/SubscriptionSyncService.kt` - Simplified playlist sync to fast flat sync only
+- `app/src/main/kotlin/com/Otter/app/ui/components/VideoCardItem.kt` - Redesigned video card
+- `app/src/main/kotlin/com/Otter/app/data/ytdlp/YtDlpSyncClient.kt` - Added yt-dlp options
+- `app/src/main/kotlin/com/Otter/app/ui/screens/settings/PrivacyPolicyScreen.kt` - New privacy policy screen
+- `app/src/main/kotlin/com/Otter/app/ui/screens/settings/ThirdPartyLicensesScreen.kt` - New third party licenses screen
+- `app/src/main/kotlin/com/Otter/app/ui/screens/settings/FairUsePolicyScreen.kt` - New fair use policy screen
+
+---
+
 # Otter v2.0.2 - Streaming & UI Improvements
 
 ## Download

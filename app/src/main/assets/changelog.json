@@ -1,6 +1,42 @@
 {
   "releases": [
     {
+      "version": "2.0.3",
+      "versionCode": 5,
+      "date": "2026-03-25",
+      "type": "patch",
+      "highlights": [
+        "Redesigned video cards with better metadata visibility",
+        "Simplified sync process to fast flat sync only",
+        "Playlist detail improvements (actions + refresh behavior)",
+        "Added Privacy Policy, Third Party Licenses, and Fair Use Policy screens"
+      ],
+      "categories": {
+        "improvements": [
+          {
+            "title": "Redesigned video cards",
+            "description": "Larger thumbnails (160dp × 90dp), added icons for channel name, views, and upload date, better spacing and typography",
+            "impact": "medium"
+          },
+          {
+            "title": "Faster playlist sync",
+            "description": "Sync behavior is now focused on a fast flat playlist refresh for smoother UX",
+            "impact": "high"
+          },
+          {
+            "title": "Playlist detail UX improvements",
+            "description": "Like/Watch Later actions on video cards and pull-to-refresh spinner no longer conflicts with sync state",
+            "impact": "medium"
+          },
+          {
+            "title": "New policy screens",
+            "description": "Added Privacy Policy, Third Party Licenses, and Fair Use Policy screens in Settings",
+            "impact": "medium"
+          }
+        ]
+      }
+    },
+    {
       "version": "2.0.2",
       "versionCode": 4,
       "date": "2026-03-24",

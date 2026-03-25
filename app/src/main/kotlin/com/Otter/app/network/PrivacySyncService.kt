@@ -71,8 +71,9 @@ class PrivacySyncService @Inject constructor(
     /**
      * Requests deletion of all data for this device.
      * Call this when the user requests data deletion.
+     * Returns a map with deletion details or null on failure.
      */
-    suspend fun requestDeviceDataDeletion(): Boolean =
+    suspend fun requestDeviceDataDeletion(): Map<String, Any>? =
         withContext(Dispatchers.IO) {
             try {
                 val deviceId = deviceIdManager.getOrCreateDeviceId()
@@ -87,10 +88,27 @@ class PrivacySyncService @Inject constructor(
 
                 val request = requestBuilder.build()
                 val response = client.newCall(request).execute()
-                response.isSuccessful
+                
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string()
+                    if (responseBody != null) {
+                        val json = JSONObject(responseBody)
+                        mapOf(
+                            "ok" to json.optBoolean("ok", true),
+                            "deviceId" to json.optString("device_id", deviceId),
+                            "analyticsEventsDeleted" to json.optInt("analytics_events_deleted", 0),
+                            "crashReportsDeleted" to json.optInt("crash_reports_deleted", 0),
+                            "privacySettingsDeleted" to json.optBoolean("privacy_settings_deleted", false),
+                        )
+                    } else {
+                        mapOf("ok" to true)
+                    }
+                } else {
+                    null
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
-                false
+                null
             }
         }
 }

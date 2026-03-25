@@ -29,7 +29,6 @@ data class DownloadPreferences(
     val sponsorBlockApiUrl: String = "",
     val noSponsorBlock: Boolean = false,
     val cookies: Boolean = false,
-    val aria2c: Boolean = false,
     val useCustomAudioPreset: Boolean = false,
     val audioFormat: Int = 0,
     val audioQuality: Int = 0,
@@ -94,7 +93,6 @@ data class DownloadPreferences(
                 sponsorBlockApiUrl = SPONSORBLOCK_API_URL.getString(),
                 noSponsorBlock = NO_SPONSORBLOCK.getBoolean(),
                 cookies = COOKIES.getBoolean(),
-                aria2c = ARIA2C.getBoolean(),
                 useCustomAudioPreset = USE_CUSTOM_AUDIO_PRESET.getBoolean(),
                 audioFormat = AUDIO_FORMAT.getInt(),
                 audioQuality = AUDIO_QUALITY.getInt(),
@@ -205,7 +203,6 @@ const val SPONSORBLOCK_REMOVE_CATEGORIES = "sponsorblock_remove_categories"
 const val SPONSORBLOCK_CHAPTER_TITLE = "sponsorblock_chapter_title"
 const val SPONSORBLOCK_API_URL = "sponsorblock_api_url"
 const val NO_SPONSORBLOCK = "no_sponsorblock"
-const val ARIA2C = "aria2c"
 const val COOKIES = "cookies"
 const val USER_AGENT_STRING = "user_agent_string"
 const val PRIVATE_MODE = "private_mode"

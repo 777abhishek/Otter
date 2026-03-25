@@ -56,22 +56,24 @@ class SyncViewModel
             }
         }
 
-        fun syncLikedVideos() {
+        fun syncWatchLaterVideos() {
             viewModelScope.launch {
                 _isRefreshing.value = true
+                _isRefreshing.value = false
                 try {
-                    syncService.syncLikedVideos()
+                    syncService.syncWatchLaterVideos()
                 } finally {
                     _isRefreshing.value = false
                 }
             }
         }
 
-        fun syncWatchLaterVideos() {
+        fun syncLikedVideos() {
             viewModelScope.launch {
                 _isRefreshing.value = true
+                _isRefreshing.value = false
                 try {
-                    syncService.syncWatchLaterVideos()
+                    syncService.syncLikedVideos()
                 } finally {
                     _isRefreshing.value = false
                 }
@@ -81,8 +83,22 @@ class SyncViewModel
         fun syncPlaylist(playlistId: String) {
             viewModelScope.launch {
                 _isRefreshing.value = true
+                _isRefreshing.value = false
                 try {
-                    syncService.syncPlaylist(playlistId)
+                    val result = syncService.syncPlaylistTwoStage(playlistId)
+                    result.onFailure { error ->
+                        syncService.setSyncState(
+                            SubscriptionSyncService.SyncState.Error(
+                                error.message ?: "Sync failed"
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    syncService.setSyncState(
+                        SubscriptionSyncService.SyncState.Error(
+                            e.message ?: "Sync failed"
+                        )
+                    )
                 } finally {
                     _isRefreshing.value = false
                 }
@@ -90,6 +106,9 @@ class SyncViewModel
         }
 
         fun dismissSyncSnackbar() {
-            syncService.dismissSyncState()
+            when (syncState.value) {
+                is SubscriptionSyncService.SyncState.Syncing -> syncService.cancelOngoingSync()
+                else -> syncService.dismissSyncState()
+            }
         }
     }

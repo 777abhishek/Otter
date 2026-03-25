@@ -241,7 +241,7 @@ fun PrivacySettings(
                                 icon = { Icon(Icons.Rounded.Security, null, modifier = Modifier.size(22.dp)) },
                                 title = "Privacy Policy",
                                 subtitle = "View privacy policy",
-                                onClick = { /* TODO: Open privacy policy */ },
+                                onClick = { navController.navigate("privacyPolicy") },
                                 showArrow = true,
                                 iconBackgroundColor = iconBgColor,
                                 iconContentColor = iconStyleColor,
@@ -287,15 +287,29 @@ fun PrivacySettings(
                     onClick = {
                         scope.launch {
                             isDeleting = true
-                            val success = privacySyncService.requestDeviceDataDeletion()
+                            val result = privacySyncService.requestDeviceDataDeletion()
                             isDeleting = false
                             showDeleteDialog = false
-                            deleteResultMessage = if (success) "Data deletion request sent successfully" else "Failed to delete data. Please try again later."
+                            deleteResultMessage = if (result != null) {
+                                val analytics = result["analyticsEventsDeleted"] as? Int ?: 0
+                                val crashes = result["crashReportsDeleted"] as? Int ?: 0
+                                val privacy = result["privacySettingsDeleted"] as? Boolean ?: false
+                                "Deleted: $analytics analytics events, $crashes crash reports. Privacy settings: ${if (privacy) "removed" else "none found"}"
+                            } else {
+                                "Failed to delete data. Please try again later."
+                            }
                         }
                     },
                     enabled = !isDeleting
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    if (isDeleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             },
             dismissButton = {

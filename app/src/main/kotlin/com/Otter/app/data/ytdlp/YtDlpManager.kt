@@ -246,6 +246,25 @@ class YtDlpManager
                 endIndex = endIndex,
             )
 
+        suspend fun extractPlaylistVideosFull(
+            playlistId: String,
+            cookiesFilePath: String?,
+        ): Result<List<com.Otter.app.data.models.Video>> =
+            syncClient.extractPlaylistVideosFull(playlistId, cookiesFilePath)
+
+        suspend fun extractPlaylistVideosChunkFull(
+            playlistId: String,
+            cookiesFilePath: String?,
+            startIndex: Int,
+            endIndex: Int,
+        ): Result<List<com.Otter.app.data.models.Video>> =
+            syncClient.extractPlaylistVideosChunkFull(
+                playlistId = playlistId,
+                cookiesFilePath = cookiesFilePath,
+                startIndex = startIndex,
+                endIndex = endIndex,
+            )
+
         fun getLogContent(): String = fileLogger.getLogContent()
 
         fun clearLog() = fileLogger.clearLog()

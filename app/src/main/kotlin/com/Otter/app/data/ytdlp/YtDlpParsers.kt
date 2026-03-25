@@ -56,22 +56,27 @@ class YtDlpParsers
                 fileLogger.log(TAG, "Found ${entries.size} entries in playlist JSON")
 
                 val videos =
-                    entries.mapNotNull { entry ->
-                        val json = entry as? Map<*, *> ?: return@mapNotNull null
-                        Video(
-                            id = json["id"] as? String ?: "",
-                            title = json["title"] as? String ?: "Unknown Video",
-                            thumbnail =
-                                json["thumbnail"] as? String
-                                    ?: (json["thumbnails"] as? List<Map<String, Any>>)?.lastOrNull()?.get("url") as? String
-                                    ?: "",
-                            channelName = json["channel"] as? String ?: json["uploader"] as? String ?: "",
-                            channelId = json["channel_id"] as? String ?: json["uploader_id"] as? String ?: "",
-                            views = json["view_count"]?.toString()?.toLongOrNull() ?: 0,
-                            duration = json["duration"]?.toString()?.toIntOrNull() ?: 0,
-                            uploadDate = json["upload_date"] as? String ?: "",
-                            description = json["description"] as? String ?: "",
-                        ).takeIf { it.id.isNotBlank() }
+                    entries.mapIndexedNotNull { index, entry ->
+                        val json = entry as? Map<*, *> ?: return@mapIndexedNotNull null
+                        val video =
+                            Video(
+                                id = json["id"] as? String ?: "",
+                                title = json["title"] as? String ?: "Unknown Video",
+                                thumbnail =
+                                    json["thumbnail"] as? String
+                                        ?: (json["thumbnails"] as? List<Map<String, Any>>)?.lastOrNull()?.get("url") as? String
+                                        ?: "",
+                                channelName = json["channel"] as? String ?: json["uploader"] as? String ?: "",
+                                channelId = json["channel_id"] as? String ?: json["uploader_id"] as? String ?: "",
+                                views = json["view_count"]?.toString()?.toLongOrNull() ?: 0,
+                                duration = json["duration"]?.toString()?.toIntOrNull() ?: 0,
+                                uploadDate = json["upload_date"] as? String ?: "",
+                                description = json["description"] as? String ?: "",
+                            ).takeIf { it.id.isNotBlank() }
+                        if (index < 3 && video != null) {
+                            fileLogger.log(TAG, "Sample video: id=${video.id} title=${video.title} channel=${video.channelName} views=${video.views} uploadDate=${video.uploadDate}")
+                        }
+                        video
                     }
                 val duration = System.currentTimeMillis() - startTime
                 fileLogger.log(TAG, "Parsed ${videos.size} valid videos from ${entries.size} entries in ${duration}ms")
@@ -80,6 +85,43 @@ class YtDlpParsers
                 val duration = System.currentTimeMillis() - startTime
                 fileLogger.logError(TAG, "Failed to parse playlist entries after ${duration}ms", e)
                 emptyList()
+            }
+        }
+
+        fun parseSingleVideoJson(output: String): Video? {
+            val startTime = System.currentTimeMillis()
+            return runCatching {
+                val trimmed = output.trim()
+                if (trimmed.isBlank()) return@runCatching null
+
+                val json = gson.fromJson(trimmed, Map::class.java) as? Map<String, Any>
+                    ?: return@runCatching null
+
+                val id =
+                    (json["id"] as? String).orEmpty().ifBlank {
+                        extractVideoIdFromUrl(json["url"] as? String)
+                            ?: extractVideoIdFromUrl(json["webpage_url"] as? String)
+                            ?: ""
+                    }
+
+                Video(
+                    id = id,
+                    title = json["title"] as? String ?: "Unknown Video",
+                    thumbnail =
+                        json["thumbnail"] as? String
+                            ?: (json["thumbnails"] as? List<Map<String, Any>>)?.lastOrNull()?.get("url") as? String
+                            ?: "",
+                    channelName = json["channel"] as? String ?: json["uploader"] as? String ?: "",
+                    channelId = json["channel_id"] as? String ?: json["uploader_id"] as? String ?: "",
+                    views = json["view_count"]?.toString()?.toLongOrNull() ?: 0,
+                    duration = json["duration"]?.toString()?.toIntOrNull() ?: 0,
+                    uploadDate = json["upload_date"] as? String ?: "",
+                    description = json["description"] as? String ?: "",
+                ).takeIf { it.id.isNotBlank() }
+            }.getOrElse { e ->
+                val duration = System.currentTimeMillis() - startTime
+                fileLogger.logError(TAG, "Failed to parse single video JSON after ${duration}ms", e)
+                null
             }
         }
 

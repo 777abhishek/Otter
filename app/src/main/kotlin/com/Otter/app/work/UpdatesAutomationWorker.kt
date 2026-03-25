@@ -81,11 +81,20 @@ class UpdatesAutomationWorker
             )
         }
 
-        private fun normalizeVersion(v: String): String = v.trim().removePrefix("v").removePrefix("V")
+        private fun normalizeVersion(v: String): String {
+            // Remove 'v' prefix, platform suffix, and any extra whitespace
+            return v.trim()
+                .removePrefix("v")
+                .removePrefix("V")
+                .split("-")[0] // Remove platform suffix like -github, -fdroid
+        }
 
         private fun compareVersions(a: String, b: String): Int {
-            val partsA = a.split(".").map { it.toIntOrNull() ?: 0 }
-            val partsB = b.split(".").map { it.toIntOrNull() ?: 0 }
+            // Normalize both versions first to remove any platform suffixes
+            val normalizedA = normalizeVersion(a)
+            val normalizedB = normalizeVersion(b)
+            val partsA = normalizedA.split(".").map { it.toIntOrNull() ?: 0 }
+            val partsB = normalizedB.split(".").map { it.toIntOrNull() ?: 0 }
             for (i in 0 until maxOf(partsA.size, partsB.size)) {
                 val pa = partsA.getOrElse(i) { 0 }
                 val pb = partsB.getOrElse(i) { 0 }

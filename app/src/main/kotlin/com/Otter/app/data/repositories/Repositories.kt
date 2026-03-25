@@ -171,13 +171,15 @@ class PlaylistRepository
             }
             playlistDao.insertPlaylist(playlist.copy(videoCount = videos.size).toEntity())
 
-            val existingById =
+            val existingInPlaylist =
                 videoDao.getVideoFlagsByPlaylistOnce(playlist.id)
                     .associateBy { it.id }
 
             val entities =
                 videos.mapIndexed { index, video ->
-                    val existing = existingById[video.id]
+                    // First check playlist-specific flags, then fall back to global flags
+                    val existing = existingInPlaylist[video.id]
+                        ?: videoDao.getVideoFlagsById(video.id)
                     val base =
                         video.toEntity(
                             playlistId = playlist.id,
@@ -186,6 +188,7 @@ class PlaylistRepository
                     if (existing == null) {
                         base
                     } else {
+                        // Preserve flags and added date, but update all other metadata
                         base.copy(
                             isDownloaded = existing.isDownloaded,
                             filePath = existing.filePath,
@@ -219,7 +222,7 @@ class PlaylistRepository
             val newVideos = videos.filter { it.id.isNotBlank() && !existingIdSet.contains(it.id) }
             if (newVideos.isEmpty()) return
 
-            val existingById =
+            val existingInPlaylist =
                 videoDao.getVideoFlagsByPlaylistOnce(playlist.id)
                     .associateBy { it.id }
 
@@ -227,7 +230,9 @@ class PlaylistRepository
 
             val entities =
                 newVideos.mapIndexed { index, video ->
-                    val existing = existingById[video.id]
+                    // First check playlist-specific flags, then fall back to global flags
+                    val existing = existingInPlaylist[video.id]
+                        ?: videoDao.getVideoFlagsById(video.id)
                     val base =
                         video.toEntity(
                             playlistId = playlist.id,
@@ -401,6 +406,7 @@ private fun VideoEntity.toVideo(): Video {
         uploadDate = uploadDate ?: "",
         description = description ?: "",
         isLiked = isLiked,
+        isWatchLater = isWatchLater,
         isWatched = false,
         streamUrl = streamUrl,
         audioStreamUrl = audioStreamUrl,
@@ -428,7 +434,7 @@ private fun Video.toEntity(
         duration = formatDuration(duration),
         thumbnailUrl = thumbnail,
         isLiked = isLiked,
-        isWatchLater = false,
+        isWatchLater = isWatchLater,
         description = description,
         url = "https://www.youtube.com/watch?v=$id",
         filePath = null,

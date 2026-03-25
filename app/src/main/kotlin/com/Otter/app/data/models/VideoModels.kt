@@ -11,6 +11,7 @@ data class Video(
     val uploadDate: String,
     val description: String,
     val isLiked: Boolean = false,
+    val isWatchLater: Boolean = false,
     val isWatched: Boolean = false,
     val streamUrl: String? = null,
     val audioStreamUrl: String? = null,

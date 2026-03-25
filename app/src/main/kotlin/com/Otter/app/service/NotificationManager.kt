@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.Otter.app.MainActivity
 import com.Otter.app.R
+import com.Otter.app.service.SyncNotificationReceiver
 import com.Otter.app.util.DynamicIconProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -69,6 +70,8 @@ class NotificationManager
             const val ACTION_CANCEL = "com.Otter.app.action.CANCEL"
             const val ACTION_RETRY = "com.Otter.app.action.RETRY"
             const val ACTION_OPEN = "com.Otter.app.action.OPEN"
+
+            const val ACTION_SYNC_CANCEL = "com.Otter.app.action.SYNC_CANCEL"
         }
 
         private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -247,8 +250,10 @@ class NotificationManager
 
             if (progress != null) {
                 builder.setProgress(100, (progress.coerceIn(0f, 1f) * 100).toInt(), false)
-            } else {
+            } else if (ongoing) {
                 builder.setProgress(0, 0, true)
+            } else {
+                builder.setProgress(0, 0, false)
             }
 
             val contentIntent =
@@ -260,8 +265,33 @@ class NotificationManager
                 )
             builder.setContentIntent(contentIntent)
 
+            if (ongoing) {
+                val cancelIntent =
+                    PendingIntent.getBroadcast(
+                        context,
+                        ACTION_SYNC_CANCEL.hashCode(),
+                        Intent(context, SyncNotificationReceiver::class.java).apply {
+                            action = ACTION_SYNC_CANCEL
+                        },
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    )
+                builder.addAction(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Cancel",
+                    cancelIntent,
+                )
+            }
+
             kotlin.runCatching {
                 notificationManager.notify(NOTIFICATION_ID_SYNC, builder.build())
+            }
+
+            // Auto-dismiss non-ongoing notifications after 5 seconds
+            if (!ongoing) {
+                scope.launch {
+                    kotlinx.coroutines.delay(5000)
+                    cancelSyncNotification()
+                }
             }
         }
 

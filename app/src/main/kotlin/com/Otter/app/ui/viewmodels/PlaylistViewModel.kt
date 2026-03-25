@@ -70,15 +70,43 @@ class PlaylistViewModel
                                     }
                                 }
                         }
-
-                    // Kick off refresh in background; UI will update as DB is written.
-                    PlaylistWorkScheduler.enqueueRefresh(
-                        context = ytDlpManager.javaClass.let { com.Otter.app.OtterApplication.appContext },
-                        playlistId = playlistId,
-                    )
                 } catch (e: Exception) {
                     _uiState.value = PlaylistUiState.Error(e.message ?: "Unknown error")
                 }
+            }
+        }
+
+        fun syncPlaylist(playlistId: String) {
+            viewModelScope.launch {
+                try {
+                    syncService.syncPlaylistTwoStageSilent(playlistId)
+                } catch (e: Exception) {
+                    // Sync failed silently, don't update UI state - let the observer handle it
+                }
+            }
+        }
+
+        fun likeVideo(videoId: String) {
+            viewModelScope.launch {
+                videoRepository.likeVideo(videoId)
+            }
+        }
+
+        fun unlikeVideo(videoId: String) {
+            viewModelScope.launch {
+                videoRepository.unlikeVideo(videoId)
+            }
+        }
+
+        fun addToWatchLater(videoId: String) {
+            viewModelScope.launch {
+                videoRepository.addToWatchLater(videoId)
+            }
+        }
+
+        fun removeFromWatchLater(videoId: String) {
+            viewModelScope.launch {
+                videoRepository.removeFromWatchLater(videoId)
             }
         }
     }

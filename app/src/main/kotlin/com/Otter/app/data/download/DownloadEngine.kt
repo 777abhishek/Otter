@@ -386,10 +386,6 @@ class DownloadEngine
             return this.toIntOrNull()?.let { it in min..max } ?: false
         }
 
-        private fun YoutubeDLRequest.enableAria2c(): YoutubeDLRequest {
-            return this.addOption("--downloader", "libaria2c.so")
-        }
-
         private fun YoutubeDLRequest.enableCookies(
             cookiesFilePath: String?,
             userAgentString: String,
@@ -686,10 +682,8 @@ class DownloadEngine
                             addOption("-r", "${task.preferences.maxDownloadRate}K")
                         }
 
-                        // Aria2c or concurrent fragments
-                        if (task.preferences.aria2c) {
-                            enableAria2c()
-                        } else if (task.preferences.concurrentFragments > 1) {
+                        // Use concurrent fragments for segmented downloads
+                        if (task.preferences.concurrentFragments > 1) {
                             addOption("--concurrent-fragments", task.preferences.concurrentFragments)
                         }
 

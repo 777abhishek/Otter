@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -86,12 +87,15 @@ import com.Otter.app.ui.screens.settings.ContributorsScreen
 import com.Otter.app.ui.screens.settings.CookieTargetsScreen
 import com.Otter.app.ui.screens.settings.DiagnosticsSettings
 import com.Otter.app.ui.screens.settings.DownloadSettings
+import com.Otter.app.ui.screens.settings.FairUsePolicyScreen
 import com.Otter.app.ui.screens.settings.NotificationSettings
 import com.Otter.app.ui.screens.settings.PowerSaverSettings
+import com.Otter.app.ui.screens.settings.PrivacyPolicyScreen
 import com.Otter.app.ui.screens.settings.PrivacySettings
 import com.Otter.app.ui.screens.settings.ProfilesSettings
 import com.Otter.app.ui.screens.settings.SettingsScreen
 import com.Otter.app.ui.screens.settings.StorageSettings
+import com.Otter.app.ui.screens.settings.ThirdPartyLicensesScreen
 import com.Otter.app.ui.screens.settings.UpdatesSettings
 import com.Otter.app.ui.screens.settings.UpdateCheckerScreen
 import com.Otter.app.ui.screens.settings.UpdateType
@@ -216,9 +220,17 @@ class MainActivity : ComponentActivity() {
         
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        window.isNavigationBarContrastEnforced = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.setSystemBarsAppearance(0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -587,6 +599,27 @@ fun Otter(onRestartApp: () -> Unit = {}) {
 
                         composable("commits") {
                             CommitsScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+
+                        composable("privacyPolicy") {
+                            PrivacyPolicyScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+
+                        composable("fairUsePolicy") {
+                            FairUsePolicyScreen(
+                                navController = navController,
+                                onBack = { navController.popBackStack() },
+                            )
+                        }
+
+                        composable("thirdPartyLicenses") {
+                            ThirdPartyLicensesScreen(
                                 navController = navController,
                                 onBack = { navController.popBackStack() },
                             )
